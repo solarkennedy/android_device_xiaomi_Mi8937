@@ -42,23 +42,8 @@ TARGET_BOARD_FASTBOOT_INFO_FILE := $(DEVICE_PATH)/fastboot-info.txt
 DEVICE_MANIFEST_FILE += $(DEVICE_PATH)/manifest.xml
 
 # Kernel
-ifeq ($(PRODUCT_HARDWARE),Mi8917)
-TARGET_KERNEL_CONFIG += \
-    vendor/msm8937-legacy.config \
-    vendor/xiaomi/msm8937/common.config \
-    vendor/xiaomi/msm8937/mi8917.config \
-    vendor/feature/lineageos.config
-else
-TARGET_KERNEL_CONFIG += \
-    vendor/msm8937-legacy.config \
-    vendor/xiaomi/msm8937/common.config \
-    vendor/xiaomi/msm8937/mi8937_exclude_mi8917.config \
-    vendor/feature/lineageos.config
-endif
-
-ifeq ($(MI8937_CAM_USE_LATEST_CAMERA_STACK),true)
-TARGET_KERNEL_CONFIG += vendor/xiaomi/msm8937/optional/latest-camera-stack.config
-endif
+# Use base defconfig from BoardConfigCommon.mk (msm8937_defconfig)
+# Vendor config fragments not available in this build; using kernel defaults
 
 # Partitions
 BOARD_USES_METADATA_PARTITION := true
