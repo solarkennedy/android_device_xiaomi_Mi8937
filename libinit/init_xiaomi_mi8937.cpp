@@ -76,6 +76,15 @@ static const variant_info_t prada_info = {
     .dpi = 280,
 };
 
+static const variant_info_t pepito_info = {
+    .brand = "Palm",
+    .device = "pepito",
+    .marketname = "",
+    .model = "PVG100",
+    .build_fingerprint = "",
+    .dpi = 264,
+};
+
 static void determine_device()
 {
     std::string codename;
@@ -99,6 +108,8 @@ static void determine_device()
         set_variant_props(ugglite_info);
     } else if (codename == "prada") {
         set_variant_props(prada_info);
+    } else if (codename == "pepito") {
+        set_variant_props(pepito_info);
     } else if (codename == "ugg") {
         set_variant_props(ugg_info);
     }
