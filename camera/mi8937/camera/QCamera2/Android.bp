@@ -70,8 +70,8 @@ cc_library_shared {
         "android.frameworks.displayservice@1.0",
         "libhidlbase",
 
-        "libts_face_beautify_hal",
-        "libts_detected_face_hal",
+        // "libts_face_beautify_hal",
+        // "libts_detected_face_hal",
         "libWmcamera_interface",
         "libWmjpeg_interface",
     ],
@@ -167,8 +167,8 @@ cc_library_shared {
         "android.frameworks.displayservice@1.0",
         "libhidlbase",
 
-        "libts_face_beautify_hal",
-        "libts_detected_face_hal",
+        // "libts_face_beautify_hal",
+        // "libts_detected_face_hal",
         "libUmcamera_interface",
         "libUmjpeg_interface",
     ],

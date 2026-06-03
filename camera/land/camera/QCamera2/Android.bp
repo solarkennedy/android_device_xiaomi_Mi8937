@@ -71,8 +71,8 @@ cc_library_shared {
         "android.frameworks.displayservice@1.0",
         "libhidlbase",
 
-        "libts_face_beautify_hal",
-        "libts_detected_face_hal",
+        // "libts_face_beautify_hal",
+        // "libts_detected_face_hal",
     ],
     srcs: [
         "util/QCameraBufferMaps.cpp",
