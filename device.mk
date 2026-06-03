@@ -53,14 +53,15 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_ODM)/bin/mm-qcamera-daemon \
     $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_ODM)/etc/camera/.placeholder
 
-PRODUCT_PACKAGES += \
-    camera.ulysse \
-    camera.wingtech
+# Disable camera builds — missing legacy headers in Lineage 23.2
+# PRODUCT_PACKAGES += \
+#     camera.ulysse \
+#     camera.wingtech
 
-ifeq ($(PRODUCT_HARDWARE),Mi8937)
-PRODUCT_PACKAGES += \
-    camera.land
-endif
+# ifeq ($(PRODUCT_HARDWARE),Mi8937)
+# PRODUCT_PACKAGES += \
+#     camera.land
+# endif
 
 # Dumpstate
 PRODUCT_PACKAGES += \
