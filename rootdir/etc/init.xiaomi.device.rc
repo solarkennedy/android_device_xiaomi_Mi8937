@@ -36,6 +36,7 @@ service vendor.qcamerasvr /odm/bin/mm-qcamera-daemon
     class late_start
     user camera
     group camera system inet input graphics
+    disabled
 
 on property:ro.vendor.xiaomi.device=land
     setprop ro.hardware.camera land
