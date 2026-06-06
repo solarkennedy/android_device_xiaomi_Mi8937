@@ -37,6 +37,35 @@ system/framework/com.qualcomm.qti.uceservice-V2.0-java.jar:system_ext/framework/
 # Keystore - from olive
 -vendor/lib64/hw/keystore.msm8937.so;DISABLE_DEPS
 
+# QSEE userspace stack - from nightly
+# qseecomd handles TrustZone listener callbacks (RPMB, SSD, secureui, etc.)
+# Required by the keymaster and gatekeeper TAs that live on dedicated TZ
+# partitions (/dev/block/by-name/keymaster, gatekeeper). Without qseecomd
+# running, TA calls into Linux hang and keymaster2_open never returns.
+# init.qti.qseecomd.sh comes from mithorium-common/rootdir/bin/ (with a
+# bounded retry loop) — do not extract the unbounded blob version here.
+-vendor/bin/qseecomd;DISABLE_DEPS
+-vendor/lib64/libQSEEComAPI.so;DISABLE_DEPS
+-vendor/lib64/libdrmfs.so;DISABLE_DEPS
+-vendor/lib64/libdrmtime.so;DISABLE_DEPS
+-vendor/lib64/libGPreqcancel.so;DISABLE_DEPS
+-vendor/lib64/libGPreqcancel_svc.so;DISABLE_DEPS
+-vendor/lib64/libqisl.so;DISABLE_DEPS
+-vendor/lib64/librpmb.so;DISABLE_DEPS
+-vendor/lib64/libsecureui.so;DISABLE_DEPS
+-vendor/lib64/libsecureui_svcsock.so;DISABLE_DEPS
+-vendor/lib64/libssd.so;DISABLE_DEPS
+# Transitive deps pulled in via the libs above. Only extract the ones not
+# already built from source. libxml2 (AOSP, vendor_available),
+# libdisplayconfig.qti / vendor.display.config@1.0 / @2.0 (built from
+# vendor/qcom/opensource/display/services and interfaces/display/config)
+# are intentionally NOT extracted — using the in-tree builds avoids
+# packaging conflicts.
+-vendor/lib64/libdiag.so;DISABLE_DEPS
+-vendor/lib64/libtime_genoff.so;DISABLE_DEPS
+-vendor/lib64/libStDrvInt.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.tui_comm@1.0.so;DISABLE_DEPS
+
 # Perf configs - from PAN
 vendor/etc/perf/commonresourceconfigs.xml
 vendor/etc/perf/perf-profile0.conf
@@ -47,7 +76,7 @@ vendor/etc/perf/targetconfig.xml
 vendor/etc/perf/targetresourceconfigs.xml
 
 # RIL (Data) - Netmgrd - from PAN
-vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config.xml|b87b057d87139c7ac866dc5f75c498de1e8ab361|ba88986b26bd8391c022121bc502cb42beef02f7
+vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config.xml|b87b057d87139c7ac866dc5f75c498de1e8ab361
 
 # Sensors - from PAN
 -vendor/bin/sensors.qti;DISABLE_DEPS
@@ -57,3 +86,125 @@ vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config
 # Sensors (SSC) - from daisy
 -vendor/lib64/libsensor_reg.so;DISABLE_DEPS
 -vendor/lib64/sensors.ssc.so;DISABLE_DEPS
+
+# ADSP RPC + audio core - from nightly
+# adsprpcd handles audio/sensors DSP communication; audio HAL needs the
+# RPC + parser libs to talk to the ADSP. ACDB calibration data
+# (/vendor/etc/acdbdata/<variant>/) is per-variant and NOT extracted —
+# pepito has no upstream ACDB set; pick a sibling (santoni/land) if
+# audio is needed, or extract from a Palm-specific source.
+-vendor/bin/adsprpcd;DISABLE_DEPS
+-vendor/lib64/libadsprpc.so;DISABLE_DEPS
+-vendor/lib64/libadsp_default_listener.so;DISABLE_DEPS
+-vendor/lib64/libaudioparsers.so;DISABLE_DEPS
+
+# Modem service daemons - from nightly
+# rmt_storage = modem EFS read/write proxy (calibration, IMEI persist)
+# time_daemon = clock sync from baseband
+# ATFWD-daemon = AT command forwarder for modem ↔ apps
+# ssr_diag / ssr_setup = subsystem-restart diagnostics
+-vendor/bin/rmt_storage;DISABLE_DEPS
+-vendor/etc/init/vendor.qti.rmt_storage.rc
+-vendor/bin/time_daemon;DISABLE_DEPS
+-vendor/bin/ATFWD-daemon;DISABLE_DEPS
+-vendor/bin/ssr_diag;DISABLE_DEPS
+-vendor/bin/ssr_setup;DISABLE_DEPS
+
+# qcrild + QMI / RIL framework - from nightly
+# qcrild is a thin dlopen launcher; libril-qc-hal-qmi.so is the real implementation.
+# android.hardware.radio.c_shim@1.0-1.2 patches the HIDL descriptor so qcrild
+# registers under lineage.hardware.radio.config namespace (built from source).
+-vendor/bin/hw/qcrild;DISABLE_DEPS
+-vendor/etc/init/qcrild.rc
+-vendor/lib64/libril-qc-hal-qmi.so;DISABLE_DEPS
+-vendor/lib64/libril-qc-logger.so;DISABLE_DEPS
+-vendor/lib64/librilqmiservices.so;DISABLE_DEPS
+-vendor/lib64/qcrild_librilutils.so;DISABLE_DEPS
+-vendor/lib64/libqmi.so;DISABLE_DEPS
+-vendor/lib64/libqmi_cci.so;DISABLE_DEPS
+-vendor/lib64/libqmi_csi.so;DISABLE_DEPS
+-vendor/lib64/libqmi_encdec.so;DISABLE_DEPS
+-vendor/lib64/libqmi_common_so.so;DISABLE_DEPS
+-vendor/lib64/libqmi_client_qmux.so;DISABLE_DEPS
+-vendor/lib64/libqmi_client_helper.so;DISABLE_DEPS
+-vendor/lib64/libqmiservices.so;DISABLE_DEPS
+-vendor/lib64/libmdmdetect.so;DISABLE_DEPS
+-vendor/lib64/libidl.so;DISABLE_DEPS
+-vendor/lib64/libqcrilFramework.so;DISABLE_DEPS
+-vendor/lib64/libqdi.so;DISABLE_DEPS
+-vendor/lib64/libqdp.so;DISABLE_DEPS
+-vendor/lib64/libdsutils.so;DISABLE_DEPS
+-vendor/lib64/libconfigdb.so;DISABLE_DEPS
+-vendor/lib64/liblqe.so;DISABLE_DEPS
+-vendor/lib64/libnetmgr.so;DISABLE_DEPS
+-vendor/lib64/libperipheral_client.so;DISABLE_DEPS
+-vendor/lib64/libsystem_health_mon.so;DISABLE_DEPS
+-vendor/lib64/libxml.so;DISABLE_DEPS
+-vendor/lib64/qtibus.so;DISABLE_DEPS
+-vendor/lib64/qtimutex.so;DISABLE_DEPS
+# libavservices_minijail — built from source in frameworks/av/media/module/minijail
+# libril — built from source in hardware/ril/libril
+
+# GPS stack - from nightly
+# loc_launcher spawns the GNSS pipeline; xtra-daemon fetches almanac
+# data for assisted GPS.
+-vendor/bin/loc_launcher;DISABLE_DEPS
+-vendor/bin/xtra-daemon;DISABLE_DEPS
+# libgps.utils, libloc_core — built from source in
+# device/xiaomi/mithorium-common/gps/{utils,core}/
+-vendor/lib64/libizat_core.so;DISABLE_DEPS
+-vendor/lib64/liblbs_core.so;DISABLE_DEPS
+# libqti_vndfwk_detect intentionally NOT extracted — built from source in
+# hardware/qcom-caf/common/fwk-detect/Android.bp
+-vendor/lib64/libcdfw_remote_api.so;DISABLE_DEPS
+-vendor/lib64/libqcc_file_agent.so;DISABLE_DEPS
+
+# IMS / VoLTE daemons - from nightly
+# imsqmidaemon + imsdatadaemon + ims_rtp_daemon form the VoLTE stack.
+# Will only function with the rest of telephony (RIL, modem) brought up.
+-vendor/bin/imsdatadaemon;DISABLE_DEPS
+-vendor/bin/imsqmidaemon;DISABLE_DEPS
+-vendor/bin/ims_rtp_daemon;DISABLE_DEPS
+-vendor/lib64/libdsi_netctrl.so;DISABLE_DEPS
+# libwpa_client — built from source in external/wpa_supplicant_8/wpa_supplicant/
+-vendor/lib64/libcneapiclient.so;DISABLE_DEPS
+-vendor/lib64/lib-imsvtcore.so;DISABLE_DEPS
+-vendor/lib64/lib-imsdpl.so;DISABLE_DEPS
+-vendor/lib64/lib-rtpsl.so;DISABLE_DEPS
+-vendor/lib64/lib-rtpcore.so;DISABLE_DEPS
+-vendor/lib64/lib-rtpcommon.so;DISABLE_DEPS
+
+# HIDL interface implementations — from nightly, only ones not source-built.
+# Resolved via transitive-NEEDED check after first vendor.img verification round.
+-vendor/lib64/vendor.qti.hardware.radio.atcmdfwd@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.am@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.ims@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.ims@1.1.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.ims@1.2.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.ims@1.3.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.ims@1.4.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.ims@1.5.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.ims@1.6.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.ims@1.7.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.internal.deviceinfo@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.lpa@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.lpa@1.1.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.qcrilhook@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.qtiradio@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.qtiradio@2.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.qtiradio@2.1.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.qtiradio@2.2.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.qtiradio@2.3.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.qtiradio@2.4.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.uim@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.uim@1.1.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.uim@1.2.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.uim_remote_client@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.uim_remote_client@1.1.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.uim_remote_client@1.2.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.radio.uim_remote_server@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.data.connection@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.data.connection@1.1.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.hardware.data.iwlan@1.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.imsrtpservice@3.0.so;DISABLE_DEPS
+-vendor/lib64/vendor.qti.imsrtpservice@3.0-service-Impl.so;DISABLE_DEPS
