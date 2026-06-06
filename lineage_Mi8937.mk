@@ -28,14 +28,14 @@ PRODUCT_PACKAGES += \
 # Device identifier. This must come after all inclusions
 PRODUCT_DEVICE := Mi8937
 PRODUCT_NAME := lineage_Mi8937
-BOARD_VENDOR := Xiaomi
-PRODUCT_BRAND := Xiaomi
-PRODUCT_MODEL := MSM8937
-PRODUCT_MANUFACTURER := Xiaomi
-TARGET_VENDOR := Xiaomi
+BOARD_VENDOR := Palm
+PRODUCT_BRAND := Palm
+PRODUCT_MODEL := PVG100
+PRODUCT_MANUFACTURER := Palm
+TARGET_VENDOR := Palm
 
-PRODUCT_GMS_CLIENTID_BASE := android-xiaomi
+PRODUCT_GMS_CLIENTID_BASE := android-palm
 
 PRODUCT_BUILD_PROP_OVERRIDES += \
-    BuildDesc="land-user 6.0.1 MMB29M V10.2.2.0.MALMIXM release-keys" \
-    BuildFingerprint=Xiaomi/land/land:6.0.1/MMB29M/V10.2.2.0.MALMIXM:user/release-keys
+    BuildDesc="Pepito-user 8.1.0 OPM1.171019.019 v1AML-0 release-keys" \
+    BuildFingerprint=Palm/PVG100/Pepito:8.1.0/OPM1.171019.019/v1AML-0:user/release-keys
