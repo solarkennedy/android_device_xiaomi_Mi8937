@@ -26,6 +26,14 @@ vendor/firmware/a506_zap.mdt
 vendor/firmware/a530_pfp.fw
 vendor/firmware/a530_pm4.fw
 
+# Firmware (Venus/video) - from pepito stock modem partition
+vendor/firmware/venus.b00
+vendor/firmware/venus.b01
+vendor/firmware/venus.b02
+vendor/firmware/venus.b03
+vendor/firmware/venus.b04
+vendor/firmware/venus.mdt
+
 # Gatekeeper - from olive
 -vendor/lib64/hw/gatekeeper.msm8937.so;DISABLE_DEPS
 
