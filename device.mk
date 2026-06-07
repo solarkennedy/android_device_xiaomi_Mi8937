@@ -32,6 +32,7 @@ PRODUCT_PACKAGES += \
     xiaomi_ugglite_overlay
 else ifeq ($(PRODUCT_HARDWARE),Mi8937)
 PRODUCT_PACKAGES += \
+    xiaomi_pepito_overlay \
     xiaomi_prada_overlay \
     xiaomi_prada_overlay_Settings \
     xiaomi_ugg_overlay \
@@ -46,7 +47,8 @@ PRODUCT_COPY_FILES += \
 # Audio
 PRODUCT_COPY_FILES += \
     $(call find-copy-subdir-files,*.xml,$(LOCAL_PATH)/audio/mixer_paths/,$(TARGET_COPY_OUT_VENDOR)/etc/) \
-    $(call find-copy-subdir-files,*.xml,$(LOCAL_PATH)/audio/platform_info/,$(TARGET_COPY_OUT_VENDOR)/etc/)
+    $(call find-copy-subdir-files,*.xml,$(LOCAL_PATH)/audio/platform_info/,$(TARGET_COPY_OUT_VENDOR)/etc/) \
+    $(call find-copy-subdir-files,*,$(LOCAL_PATH)/audio/acdbdata/pepito/,$(TARGET_COPY_OUT_VENDOR)/etc/acdbdata/pepito/)
 
 # Camera
 PRODUCT_COPY_FILES += \

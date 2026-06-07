@@ -108,6 +108,18 @@ case "$(cat /sys/xiaomi-msm8937-mach/codename)" in
 		# Fingerprint
 		setprop ro.vendor.fingerprint.supported 1
 		;;
+	"pepito")
+		# Device Info
+		setprop ro.vendor.xiaomi.device pepito
+		setprop ro.vendor.xiaomi.series mi8937
+		# Audio — ACDB from stock Palm Android 8.1 MTP set
+		setprop persist.vendor.audio.fluence.speaker true
+		setprop persist.vendor.audio.fluence.voicecall true
+		setprop persist.vendor.audio.fluence.voicerec false
+		set_acdb_path_props pepito
+		# Fingerprint — Palm PVG-100 has no fingerprint sensor
+		setprop ro.vendor.fingerprint.supported 0
+		;;
 esac
 
 exit 0
