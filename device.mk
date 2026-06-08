@@ -71,6 +71,11 @@ PRODUCT_COPY_FILES += \
 #     camera.land
 # endif
 
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+PRODUCT_PACKAGES += \
+    camera.land
+endif
+
 # Dumpstate
 PRODUCT_PACKAGES += \
     libdumpstate_device
