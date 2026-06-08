@@ -38,6 +38,12 @@ service vendor.qcamerasvr /odm/bin/mm-qcamera-daemon
     group camera system inet input graphics
     disabled
 
+on property:ro.vendor.xiaomi.device=pepito
+    setprop ro.hardware.camera land
+    mount overlay overlay /odm/bin ro lowerdir=/vendor/bin/overlayfs/pepito/:/odm/bin
+    mount overlay overlay /odm/lib ro lowerdir=/vendor/lib/overlayfs/pepito/:/odm/lib
+    mount overlay overlay /odm/etc/camera ro lowerdir=/vendor/etc/overlayfs/pepito/camera/:/odm/etc/camera
+    enable vendor.qcamerasvr
 on property:ro.vendor.xiaomi.device=land
     setprop ro.hardware.camera land
 on property:ro.vendor.xiaomi.device=prada

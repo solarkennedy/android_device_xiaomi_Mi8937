@@ -17,6 +17,46 @@ vendor/etc/diracmobile.config|b99e9492e77e52ca3a511feae0409d59f6aebb87
 # Charger - from daisy
 -vendor/bin/hvdcp_opti;DISABLE_DEPS
 
+# Camera stack (pepito) - from Palm PVG100 stock AML0
+-bin/mm-qcamera-daemon:vendor/bin/overlayfs/pepito/mm-qcamera-daemon;DISABLE_DEPS;MODULE=pepito_mm-qcamera-daemon
+-vendor/lib/libactuator_dw9800.so:vendor/lib/overlayfs/pepito/libactuator_dw9800.so;DISABLE_DEPS;MODULE=pepito_libactuator_dw9800
+-vendor/lib/libchromaflash.so:vendor/lib/overlayfs/pepito/libchromaflash.so;DISABLE_DEPS;MODULE=pepito_libchromaflash
+-vendor/lib/libflash_pmic.so:vendor/lib/overlayfs/pepito/libflash_pmic.so;DISABLE_DEPS;MODULE=pepito_libflash_pmic
+-vendor/lib/libjpegdhw.so:vendor/lib/overlayfs/pepito/libjpegdhw.so;DISABLE_DEPS;MODULE=pepito_libjpegdhw
+-vendor/lib/libjpegdmahw.so:vendor/lib/overlayfs/pepito/libjpegdmahw.so;DISABLE_DEPS;MODULE=pepito_libjpegdmahw
+-vendor/lib/libjpegehw.so:vendor/lib/overlayfs/pepito/libjpegehw.so;DISABLE_DEPS;MODULE=pepito_libjpegehw
+-vendor/lib/libmmcamera2_c2d_module.so:vendor/lib/overlayfs/pepito/libmmcamera2_c2d_module.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_c2d_module
+-vendor/lib/libmmcamera2_cpp_module.so:vendor/lib/overlayfs/pepito/libmmcamera2_cpp_module.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_cpp_module
+-vendor/lib/libmmcamera2_dcrf.so:vendor/lib/overlayfs/pepito/libmmcamera2_dcrf.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_dcrf
+-vendor/lib/libmmcamera2_frame_algorithm.so:vendor/lib/overlayfs/pepito/libmmcamera2_frame_algorithm.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_frame_algorithm
+-vendor/lib/libmmcamera2_iface_modules.so:vendor/lib/overlayfs/pepito/libmmcamera2_iface_modules.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_iface_modules
+-vendor/lib/libmmcamera2_imglib_modules.so:vendor/lib/overlayfs/pepito/libmmcamera2_imglib_modules.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_imglib_modules
+-vendor/lib/libmmcamera2_isp_modules.so:vendor/lib/overlayfs/pepito/libmmcamera2_isp_modules.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_isp_modules
+-vendor/lib/libmmcamera2_is.so:vendor/lib/overlayfs/pepito/libmmcamera2_is.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_is
+-vendor/lib/libmmcamera2_mct.so:vendor/lib/overlayfs/pepito/libmmcamera2_mct.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_mct
+-vendor/lib/libmmcamera2_mct_shimlayer.so:vendor/lib/overlayfs/pepito/libmmcamera2_mct_shimlayer.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_mct_shimlayer
+-vendor/lib/libmmcamera2_pp_buf_mgr.so:vendor/lib/overlayfs/pepito/libmmcamera2_pp_buf_mgr.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_pp_buf_mgr
+-vendor/lib/libmmcamera2_pproc_modules.so:vendor/lib/overlayfs/pepito/libmmcamera2_pproc_modules.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_pproc_modules
+-vendor/lib/libmmcamera2_q3a_core.so:vendor/lib/overlayfs/pepito/libmmcamera2_q3a_core.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_q3a_core
+-vendor/lib/libmmcamera2_sensor_modules.so:vendor/lib/overlayfs/pepito/libmmcamera2_sensor_modules.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_sensor_modules
+-vendor/lib/libmmcamera2_stats_algorithm.so:vendor/lib/overlayfs/pepito/libmmcamera2_stats_algorithm.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_stats_algorithm
+-vendor/lib/libmmcamera2_stats_modules.so:vendor/lib/overlayfs/pepito/libmmcamera2_stats_modules.so;DISABLE_DEPS;MODULE=pepito_libmmcamera2_stats_modules
+-vendor/lib/libmmcamera_dbg.so:vendor/lib/overlayfs/pepito/libmmcamera_dbg.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_dbg
+-vendor/lib/libmmcamera_faceproc.so:vendor/lib/overlayfs/pepito/libmmcamera_faceproc.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_faceproc
+-vendor/lib/libmmcamera_faceproc2.so:vendor/lib/overlayfs/pepito/libmmcamera_faceproc2.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_faceproc2
+-vendor/lib/libmmcamera_gc8034.so:vendor/lib/overlayfs/pepito/libmmcamera_gc8034.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_gc8034
+-vendor/lib/libmmcamera_gc8034_otp_eeprom.so:vendor/lib/overlayfs/pepito/libmmcamera_gc8034_otp_eeprom.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_gc8034_otp_eeprom
+-vendor/lib/libmmcamera_imglib.so:vendor/lib/overlayfs/pepito/libmmcamera_imglib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_imglib
+-vendor/lib/libmmcamera_ov12a10.so:vendor/lib/overlayfs/pepito/libmmcamera_ov12a10.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_ov12a10
+-vendor/lib/libmmcamera_qtech_ov12a10_eeprom.so:vendor/lib/overlayfs/pepito/libmmcamera_qtech_ov12a10_eeprom.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_qtech_ov12a10_eeprom
+-vendor/lib/libmmcamera_s5k4h8.so:vendor/lib/overlayfs/pepito/libmmcamera_s5k4h8.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_s5k4h8
+
+# Camera configs (pepito) - from Palm PVG100 stock AML0
+etc/camera/camera_config.xml:vendor/etc/overlayfs/pepito/camera/camera_config.xml
+etc/camera/gc8034_chromatix.xml:vendor/etc/overlayfs/pepito/camera/gc8034_chromatix.xml
+etc/camera/ov12a10_chromatix.xml:vendor/etc/overlayfs/pepito/camera/ov12a10_chromatix.xml
+etc/camera/s5k4h8_chromatix.xml:vendor/etc/overlayfs/pepito/camera/s5k4h8_chromatix.xml
+
 # Firmware (GPU) - from PAN
 vendor/firmware/a506_zap.b00
 vendor/firmware/a506_zap.b01
