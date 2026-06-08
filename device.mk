@@ -32,12 +32,18 @@ PRODUCT_PACKAGES += \
     xiaomi_ugglite_overlay
 else ifeq ($(PRODUCT_HARDWARE),Mi8937)
 PRODUCT_PACKAGES += \
-    xiaomi_pepito_overlay \
     xiaomi_prada_overlay \
     xiaomi_prada_overlay_Settings \
     xiaomi_ugg_overlay \
     xiaomi_wt8937_overlay \
     xiaomi_wt8937_overlay_Settings
+
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+PRODUCT_PACKAGES += \
+    VolumeTile \
+    xiaomi_pepito_overlay \
+    xiaomi_pepito_overlay_systemui
+endif
 endif
 
 # Permissions

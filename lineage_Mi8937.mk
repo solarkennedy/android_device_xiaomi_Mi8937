@@ -14,6 +14,7 @@ $(call inherit-product, vendor/lineage/config/common_full_phone.mk)
 
 # Inherit from Mi8937 device
 PRODUCT_HARDWARE := Mi8937
+TARGET_DEVICE_PEPITO := true
 $(call inherit-product, device/xiaomi/Mi8937/device.mk)
 
 # Overlays
@@ -24,6 +25,11 @@ PRODUCT_PACKAGES += \
     xiaomi_prada_overlay_lineage \
     xiaomi_ulysse_overlay_lineage \
     xiaomi_wt8937_overlay_lineage
+
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+PRODUCT_PACKAGES += \
+    xiaomi_pepito_overlay_lineage
+endif
 
 # Device identifier. This must come after all inclusions
 PRODUCT_DEVICE := Mi8937
