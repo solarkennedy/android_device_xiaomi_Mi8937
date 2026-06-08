@@ -1,0 +1,5 @@
+runtime_resource_overlay {
+    name: "xiaomi_pepito_overlay_systemui",
+    sdk_version: "current",
+    vendor: true,
+}
