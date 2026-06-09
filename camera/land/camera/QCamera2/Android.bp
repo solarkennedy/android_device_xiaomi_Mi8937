@@ -8,6 +8,7 @@ cc_library_shared {
         "-Wno-unused-variable",
         "-Wno-implicit-fallthrough",
         "-Wno-compound-token-split-by-macro",
+        "-Wno-macro-redefined",
         "-DSYSTEM_HEADER_PREFIX=sys",
         "-DCONFIG_MACH_XIAOMI_MSM8937",
         "-DCONFIG_MACH_XIAOMI_LAND",
