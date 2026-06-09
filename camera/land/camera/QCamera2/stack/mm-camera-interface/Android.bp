@@ -15,6 +15,7 @@ cc_library_shared {
         "-Wall",
         "-Wextra",
         "-Werror",
+        "-Wno-macro-redefined",
     ],
     include_dirs: [
         "device/xiaomi/Mi8937/camera/land/camera/QCamera2/stack/common",

@@ -9,6 +9,7 @@ cc_library_shared {
         "-Wall",
         "-Wextra",
         "-Werror",
+        "-Wno-macro-redefined",
         "-Wno-unused-parameter",
         "-DUSE_ION",
         "-DMM_JPEG_CONCURRENT_SESSIONS_COUNT=1",
