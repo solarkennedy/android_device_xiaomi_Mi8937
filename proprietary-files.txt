@@ -50,6 +50,23 @@ vendor/etc/diracmobile.config|b99e9492e77e52ca3a511feae0409d59f6aebb87
 -vendor/lib/libmmcamera_ov12a10.so:vendor/lib/overlayfs/pepito/libmmcamera_ov12a10.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_ov12a10
 -vendor/lib/libmmcamera_qtech_ov12a10_eeprom.so:vendor/lib/overlayfs/pepito/libmmcamera_qtech_ov12a10_eeprom.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_qtech_ov12a10_eeprom
 -vendor/lib/libmmcamera_s5k4h8.so:vendor/lib/overlayfs/pepito/libmmcamera_s5k4h8.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_s5k4h8
+-vendor/lib/libmmcamera_thread_services.so:vendor/lib/overlayfs/pepito/libmmcamera_thread_services.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_thread_services
+-vendor/lib/libOpenCL.so:vendor/lib/overlayfs/pepito/libOpenCL.so;DISABLE_DEPS;MODULE=pepito_libOpenCL
+-vendor/lib/libdiag.so:vendor/lib/overlayfs/pepito/libdiag.so;DISABLE_DEPS;MODULE=pepito_libdiag
+-vendor/lib/libdsutils.so:vendor/lib/overlayfs/pepito/libdsutils.so;DISABLE_DEPS;MODULE=pepito_libdsutils
+-vendor/lib/libfastcvopt.so:vendor/lib/overlayfs/pepito/libfastcvopt.so;DISABLE_DEPS;MODULE=pepito_libfastcvopt
+-vendor/lib/libidl.so:vendor/lib/overlayfs/pepito/libidl.so;DISABLE_DEPS;MODULE=pepito_libidl
+-vendor/lib/libmdmdetect.so:vendor/lib/overlayfs/pepito/libmdmdetect.so;DISABLE_DEPS;MODULE=pepito_libmdmdetect
+-vendor/lib/libmmcamera_eztune_module.so:vendor/lib/overlayfs/pepito/libmmcamera_eztune_module.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_eztune_module
+-vendor/lib/libmmcamera_pdaf.so:vendor/lib/overlayfs/pepito/libmmcamera_pdaf.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_pdaf
+-vendor/lib/libmmcamera_pdafcamif.so:vendor/lib/overlayfs/pepito/libmmcamera_pdafcamif.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_pdafcamif
+-vendor/lib/libmmcamera_ppbase_module.so:vendor/lib/overlayfs/pepito/libmmcamera_ppbase_module.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_ppbase_module
+-vendor/lib/libqmi_cci.so:vendor/lib/overlayfs/pepito/libqmi_cci.so;DISABLE_DEPS;MODULE=pepito_libqmi_cci
+-vendor/lib/libqmi_client_qmux.so:vendor/lib/overlayfs/pepito/libqmi_client_qmux.so;DISABLE_DEPS;MODULE=pepito_libqmi_client_qmux
+-vendor/lib/libqmi_common_so.so:vendor/lib/overlayfs/pepito/libqmi_common_so.so;DISABLE_DEPS;MODULE=pepito_libqmi_common_so
+-vendor/lib/libqmi_encdec.so:vendor/lib/overlayfs/pepito/libqmi_encdec.so;DISABLE_DEPS;MODULE=pepito_libqmi_encdec
+-vendor/lib/libqmiservices.so:vendor/lib/overlayfs/pepito/libqmiservices.so;DISABLE_DEPS;MODULE=pepito_libqmiservices
+-vendor/lib/libsensor1.so:vendor/lib/overlayfs/pepito/libsensor1.so;DISABLE_DEPS;MODULE=pepito_libsensor1
 
 # Camera configs (pepito) - from Palm PVG100 stock AML0
 etc/camera/camera_config.xml:vendor/etc/overlayfs/pepito/camera/camera_config.xml
