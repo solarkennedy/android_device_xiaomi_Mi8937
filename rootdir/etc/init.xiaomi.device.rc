@@ -5,6 +5,12 @@ service vendor.xiaomi_device_script /vendor/bin/init.xiaomi.device.sh
     oneshot
 
 # Audio
+on post-fs-data && property:ro.vendor.xiaomi.device=pepito
+    mkdir /data/vendor/camera 0770 camera camera
+    rm /data/vendor/qcam
+    rmdir /data/vendor/qcam
+    symlink /data/vendor/camera /data/vendor/qcam
+
 on property:ro.vendor.xiaomi.device=land
     setprop vendor.audio.mixer_xml.path /vendor/etc/land_mixer_paths_qrd_sku1.xml
     setprop vendor.audio.platform_info_xml.path /vendor/etc/land_audio_platform_info_intcodec.xml
@@ -39,10 +45,19 @@ service vendor.qcamerasvr /odm/bin/mm-qcamera-daemon
     disabled
 
 on property:ro.vendor.xiaomi.device=pepito
-    setprop ro.hardware.camera land
+    setprop ro.hardware.camera msm8937
+    setprop persist.radio.multisim.config ssss
+    setprop persist.camera.gyro.disable 1
+    setprop persist.vendor.camera.eis.enable 0
+    setprop persist.vendor.camera.is_type 0
+    setprop persist.vendor.camera.is_type_preview 0
     mount overlay overlay /odm/bin ro lowerdir=/vendor/bin/overlayfs/pepito/:/odm/bin
     mount overlay overlay /odm/lib ro lowerdir=/vendor/lib/overlayfs/pepito/:/odm/lib
     mount overlay overlay /odm/etc/camera ro lowerdir=/vendor/etc/overlayfs/pepito/camera/:/odm/etc/camera
+    mount none /apex/com.android.i18n/lib/libandroidicu.so /vendor/odm/lib/libandroidicu.so bind
+    mount none /apex/com.android.i18n/lib/libicu.so /vendor/odm/lib/libicu.so bind
+    mount none /apex/com.android.i18n/lib/libicui18n.so /vendor/odm/lib/libicui18n.so bind
+    mount none /apex/com.android.i18n/lib/libicuuc.so /vendor/odm/lib/libicuuc.so bind
     enable vendor.qcamerasvr
 on property:ro.vendor.xiaomi.device=land
     setprop ro.hardware.camera land
