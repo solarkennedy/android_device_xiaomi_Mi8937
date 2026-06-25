@@ -7,9 +7,18 @@
 # Cryptfshw
 TARGET_EXCLUDE_CRYPTFSHW := true
 
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+TARGET_USES_DEVICE_SPECIFIC_KEYMASTER := true
+endif
+
 # Inherit from mithorium-common
 $(call inherit-product, device/xiaomi/mithorium-common/mithorium.mk)
+
+# Sibling Mi8937 devices keep the 2 GB phone heap profile. Pepito uses
+# Android Go defaults from lineage_Mi8937.mk instead.
+ifneq ($(TARGET_DEVICE_PEPITO),true)
 $(call inherit-product, frameworks/native/build/phone-xhdpi-2048-dalvik-heap.mk)
+endif
 
 # Boot animation
 TARGET_SCREEN_HEIGHT := 1280
@@ -59,7 +68,12 @@ PRODUCT_COPY_FILES += \
 # Camera
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_ODM)/bin/mm-qcamera-daemon \
-    $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_ODM)/etc/camera/.placeholder
+    $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_ODM)/etc/camera/.placeholder \
+    $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_ODM)/lib/.placeholder \
+    $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_VENDOR)/lib/overlayfs/pepito/libandroidicu.so \
+    $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_VENDOR)/lib/overlayfs/pepito/libicu.so \
+    $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_VENDOR)/lib/overlayfs/pepito/libicui18n.so \
+    $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_VENDOR)/lib/overlayfs/pepito/libicuuc.so
 
 # Disable camera builds — missing legacy headers in Lineage 23.2
 # PRODUCT_PACKAGES += \
@@ -71,14 +85,17 @@ PRODUCT_COPY_FILES += \
 #     camera.land
 # endif
 
-ifeq ($(TARGET_DEVICE_PEPITO),true)
-PRODUCT_PACKAGES += \
-    camera.land
-endif
+# Pepito uses the stock AML0 camera.msm8937 HAL through the pepito overlayfs.
+# The source-built camera.pepito path reaches the daemon but fails IMGLIB startup.
 
 # Dumpstate
 PRODUCT_PACKAGES += \
     libdumpstate_device
+
+# Linker config — expose libandroid.so and libjnigraphics.so to vendor namespace
+# Required by libVDBeautyShotAPI.so (DT_NEEDED by camera.msm8937.so)
+PRODUCT_VENDOR_LINKER_CONFIG_FRAGMENTS += \
+    device/xiaomi/Mi8937/configs/linker.config.json
 
 # Filesystem
 PRODUCT_PACKAGES += \
@@ -92,6 +109,15 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/emulated_storage.mk)
 # Use FUSE passthrough
 PRODUCT_PRODUCT_PROPERTIES += \
     persist.sys.fuse.passthrough.enable=true
+
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+# Pepito's stock QTI keymaster wrapper rejects Android 16 OS version tags during
+# configure. The blob is patched to read these stock-compatible values instead
+# of ro.build.version.* for the configure command.
+PRODUCT_SYSTEM_PROPERTIES += \
+    ro.keymaster.xxx.release=8.1.0 \
+    ro.keymaster.xxx.security_patch=2020-09-01
+endif
 
 # Fingerprint
 ifeq ($(PRODUCT_HARDWARE),Mi8937)
@@ -135,6 +161,27 @@ PRODUCT_PACKAGES += \
     init.baseband.sh \
     init.xiaomi.device.rc \
     init.xiaomi.device.sh
+
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+PRODUCT_PACKAGES += \
+    init.pepito.qseecom.rc \
+    init.pepito.qseecom.sh \
+    android.hardware.keymaster@3.0-service-qti \
+    android.hardware.keymaster@3.0-impl-qti \
+    android.hardware.keymaster@3.0.vendor \
+    libkeymasterdeviceutils \
+    libkeymasterutils
+
+PRODUCT_COPY_FILES += \
+    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b00:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b00 \
+    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b01:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b01 \
+    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b02:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b02 \
+    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b03:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b03 \
+    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b04:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b04 \
+    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b05:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b05 \
+    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b06:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b06 \
+    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.mdt:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.mdt
+endif
 
 ifeq ($(PRODUCT_HARDWARE),Mi8937)
 PRODUCT_PACKAGES += \

@@ -19,8 +19,40 @@ vendor/etc/diracmobile.config|b99e9492e77e52ca3a511feae0409d59f6aebb87
 
 # Camera stack (pepito) - from Palm PVG100 stock AML0
 -bin/mm-qcamera-daemon:vendor/bin/overlayfs/pepito/mm-qcamera-daemon;DISABLE_DEPS;MODULE=pepito_mm-qcamera-daemon
+-lib/hw/camera.msm8937.so:vendor/lib/overlayfs/pepito/hw/camera.msm8937.so;DISABLE_DEPS;MODULE=pepito_camera_msm8937
+-lib/libcamera_imgproc.so:vendor/lib/overlayfs/pepito/libcamera_imgproc.so;DISABLE_DEPS;MODULE=pepito_libcamera_imgproc
+-lib/libmmcamera_interface.so:vendor/lib/overlayfs/pepito/libmmcamera_interface.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_interface
+-lib/libmmjpeg_interface.so:vendor/lib/overlayfs/pepito/libmmjpeg_interface.so;DISABLE_DEPS;MODULE=pepito_libmmjpeg_interface
+-lib/libopencv_java3.so:vendor/lib/overlayfs/pepito/libopencv_java3.so;DISABLE_DEPS;MODULE=pepito_libopencv_java3
+-lib/libqomx_core.so:vendor/lib/overlayfs/pepito/libqomx_core.so;DISABLE_DEPS;MODULE=pepito_libqomx_core
+-lib/libTsProcess.so:vendor/lib/overlayfs/pepito/libTsProcess.so;DISABLE_DEPS;MODULE=pepito_libTsProcess
+# libstdc++.so: stock 8.1 minimal C++ runtime stub (from system.bin, not vendor.bin); pinned. Needed by libTsProcess.so; system libstdc++ is not exposed to the vendor linker namespace, so it is bundled into the overlay instead.
+-lib/libstdc++.so:vendor/lib/overlayfs/pepito/libstdc++.so;DISABLE_DEPS;MODULE=pepito_libstdcpp
+-lib/libVDBeautyShotAPI.so:vendor/lib/overlayfs/pepito/libVDBeautyShotAPI.so;DISABLE_DEPS;MODULE=pepito_libVDBeautyShotAPI
 -vendor/lib/libactuator_dw9800.so:vendor/lib/overlayfs/pepito/libactuator_dw9800.so;DISABLE_DEPS;MODULE=pepito_libactuator_dw9800
 -vendor/lib/libchromaflash.so:vendor/lib/overlayfs/pepito/libchromaflash.so;DISABLE_DEPS;MODULE=pepito_libchromaflash
+-vendor/lib/libhdr_tm.so:vendor/lib/overlayfs/pepito/libhdr_tm.so;DISABLE_DEPS;MODULE=pepito_libhdr_tm
+-vendor/lib/libmmcamera_chromaflash_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_chromaflash_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_chromaflash_lib
+-vendor/lib/libmmcamera_cac3_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_cac3_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_cac3_lib
+-vendor/lib/libmmcamera_dcrf_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_dcrf_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_dcrf_lib
+-vendor/lib/libmmcamera_dummyalgo.so:vendor/lib/overlayfs/pepito/libmmcamera_dummyalgo.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_dummyalgo
+-vendor/lib/libmmcamera_facedetection_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_facedetection_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_facedetection_lib
+-vendor/lib/libmmcamera_tuning.so:vendor/lib/overlayfs/pepito/libmmcamera_tuning.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_tuning
+-vendor/lib/libmmcamera_tuning_lookup.so:vendor/lib/overlayfs/pepito/libmmcamera_tuning_lookup.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_tuning_lookup
+-vendor/lib/libmmcamera_hdr_gb_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_hdr_gb_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_hdr_gb_lib
+-vendor/lib/libmmcamera_llvd.so:vendor/lib/overlayfs/pepito/libmmcamera_llvd.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_llvd
+-vendor/lib/libmmcamera_optizoom_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_optizoom_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_optizoom_lib
+-vendor/lib/libmmcamera_paaf_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_paaf_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_paaf_lib
+-vendor/lib/libmmcamera_quadracfa.so:vendor/lib/overlayfs/pepito/libmmcamera_quadracfa.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_quadracfa
+-vendor/lib/libmmcamera_stillmore_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_stillmore_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_stillmore_lib
+-vendor/lib/libmmcamera_sw2d_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_sw2d_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_sw2d_lib
+-vendor/lib/libmmcamera_trueportrait_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_trueportrait_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_trueportrait_lib
+-vendor/lib/libmmcamera_ubifocus_lib.so:vendor/lib/overlayfs/pepito/libmmcamera_ubifocus_lib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_ubifocus_lib
+# imgbase algo implementation libs (dlopen'd at runtime by wrapper libs above)
+-lib/liboptizoom.so:vendor/lib/overlayfs/pepito/liboptizoom.so;DISABLE_DEPS;MODULE=pepito_liboptizoom
+-lib/libremosaic_daemon.so:vendor/lib/overlayfs/pepito/libremosaic_daemon.so;DISABLE_DEPS;MODULE=pepito_libremosaic_daemon
+-lib/libseemore.so:vendor/lib/overlayfs/pepito/libseemore.so;DISABLE_DEPS;MODULE=pepito_libseemore
+-lib/libubifocus.so:vendor/lib/overlayfs/pepito/libubifocus.so;DISABLE_DEPS;MODULE=pepito_libubifocus
 -vendor/lib/libflash_pmic.so:vendor/lib/overlayfs/pepito/libflash_pmic.so;DISABLE_DEPS;MODULE=pepito_libflash_pmic
 -vendor/lib/libjpegdhw.so:vendor/lib/overlayfs/pepito/libjpegdhw.so;DISABLE_DEPS;MODULE=pepito_libjpegdhw
 -vendor/lib/libjpegdmahw.so:vendor/lib/overlayfs/pepito/libjpegdmahw.so;DISABLE_DEPS;MODULE=pepito_libjpegdmahw
@@ -47,6 +79,40 @@ vendor/etc/diracmobile.config|b99e9492e77e52ca3a511feae0409d59f6aebb87
 -vendor/lib/libmmcamera_gc8034.so:vendor/lib/overlayfs/pepito/libmmcamera_gc8034.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_gc8034
 -vendor/lib/libmmcamera_gc8034_otp_eeprom.so:vendor/lib/overlayfs/pepito/libmmcamera_gc8034_otp_eeprom.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_gc8034_otp_eeprom
 -vendor/lib/libmmcamera_imglib.so:vendor/lib/overlayfs/pepito/libmmcamera_imglib.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_imglib
+-vendor/lib/libmmcamera_isp_abf40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_abf40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_abf40
+-vendor/lib/libmmcamera_isp_bcc40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_bcc40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_bcc40
+-vendor/lib/libmmcamera_isp_be_stats44.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_be_stats44.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_be_stats44
+-vendor/lib/libmmcamera_isp_bf_stats47.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_bf_stats47.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_bf_stats47
+-vendor/lib/libmmcamera_isp_bg_stats44.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_bg_stats44.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_bg_stats44
+-vendor/lib/libmmcamera_isp_bhist_stats44.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_bhist_stats44.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_bhist_stats44
+-vendor/lib/libmmcamera_isp_bpc40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_bpc40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_bpc40
+-vendor/lib/libmmcamera_isp_chroma_enhan40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_chroma_enhan40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_chroma_enhan40
+-vendor/lib/libmmcamera_isp_chroma_suppress40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_chroma_suppress40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_chroma_suppress40
+-vendor/lib/libmmcamera_isp_clamp_encoder40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_clamp_encoder40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_clamp_encoder40
+-vendor/lib/libmmcamera_isp_clamp_video40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_clamp_video40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_clamp_video40
+-vendor/lib/libmmcamera_isp_clamp_viewfinder40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_clamp_viewfinder40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_clamp_viewfinder40
+-vendor/lib/libmmcamera_isp_color_correct40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_color_correct40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_color_correct40
+-vendor/lib/libmmcamera_isp_color_xform_encoder40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_color_xform_encoder40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_color_xform_encoder40
+-vendor/lib/libmmcamera_isp_color_xform_viewfinder40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_color_xform_viewfinder40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_color_xform_viewfinder40
+-vendor/lib/libmmcamera_isp_cs_stats44.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_cs_stats44.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_cs_stats44
+-vendor/lib/libmmcamera_isp_demosaic40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_demosaic40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_demosaic40
+-vendor/lib/libmmcamera_isp_demux40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_demux40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_demux40
+-vendor/lib/libmmcamera_isp_fovcrop_encoder40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_fovcrop_encoder40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_fovcrop_encoder40
+-vendor/lib/libmmcamera_isp_fovcrop_viewfinder40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_fovcrop_viewfinder40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_fovcrop_viewfinder40
+-vendor/lib/libmmcamera_isp_gamma40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_gamma40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_gamma40
+-vendor/lib/libmmcamera_isp_ihist_stats44.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_ihist_stats44.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_ihist_stats44
+-vendor/lib/libmmcamera_isp_linearization40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_linearization40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_linearization40
+-vendor/lib/libmmcamera_isp_ltm44.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_ltm44.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_ltm44
+-vendor/lib/libmmcamera_isp_luma_adaptation40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_luma_adaptation40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_luma_adaptation40
+-vendor/lib/libmmcamera_isp_mce40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_mce40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_mce40
+-vendor/lib/libmmcamera_isp_mesh_rolloff40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_mesh_rolloff40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_mesh_rolloff40
+-vendor/lib/libmmcamera_isp_rs_stats44.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_rs_stats44.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_rs_stats44
+-vendor/lib/libmmcamera_isp_scaler_encoder44.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_scaler_encoder44.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_scaler_encoder44
+-vendor/lib/libmmcamera_isp_scaler_viewfinder44.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_scaler_viewfinder44.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_scaler_viewfinder44
+-vendor/lib/libmmcamera_isp_sce40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_sce40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_sce40
+-vendor/lib/libmmcamera_isp_sub_module.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_sub_module.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_sub_module
+-vendor/lib/libmmcamera_isp_template.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_template.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_template
+-vendor/lib/libmmcamera_isp_wb40.so:vendor/lib/overlayfs/pepito/libmmcamera_isp_wb40.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_isp_wb40
 -vendor/lib/libmmcamera_ov12a10.so:vendor/lib/overlayfs/pepito/libmmcamera_ov12a10.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_ov12a10
 -vendor/lib/libmmcamera_qtech_ov12a10_eeprom.so:vendor/lib/overlayfs/pepito/libmmcamera_qtech_ov12a10_eeprom.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_qtech_ov12a10_eeprom
 -vendor/lib/libmmcamera_s5k4h8.so:vendor/lib/overlayfs/pepito/libmmcamera_s5k4h8.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_s5k4h8
@@ -69,10 +135,21 @@ vendor/etc/diracmobile.config|b99e9492e77e52ca3a511feae0409d59f6aebb87
 -vendor/lib/libsensor1.so:vendor/lib/overlayfs/pepito/libsensor1.so;DISABLE_DEPS;MODULE=pepito_libsensor1
 
 # Camera configs (pepito) - from Palm PVG100 stock AML0
+etc/camera/camera_config.xml:vendor/etc/camera/camera_config.xml
+etc/camera/gc8034_chromatix.xml:vendor/etc/camera/gc8034_chromatix.xml
+etc/camera/ov12a10_chromatix.xml:vendor/etc/camera/ov12a10_chromatix.xml
+etc/camera/s5k4h8_chromatix.xml:vendor/etc/camera/s5k4h8_chromatix.xml
 etc/camera/camera_config.xml:vendor/etc/overlayfs/pepito/camera/camera_config.xml
 etc/camera/gc8034_chromatix.xml:vendor/etc/overlayfs/pepito/camera/gc8034_chromatix.xml
 etc/camera/ov12a10_chromatix.xml:vendor/etc/overlayfs/pepito/camera/ov12a10_chromatix.xml
 etc/camera/s5k4h8_chromatix.xml:vendor/etc/overlayfs/pepito/camera/s5k4h8_chromatix.xml
+
+# Media/display C2D blitter - from Mi8937 nightly
+-vendor/lib/libC2D2.so;DISABLE_DEPS|64e2a5a20312e5cb59c23b3a3a99bf8912946ed3
+-vendor/lib64/libC2D2.so;DISABLE_DEPS|6fb775e393ce7161b30e3a71fa0f320e86374425
+
+# Firmware (CPP camera) - from Palm PVG100 stock AML0
+firmware/cpp_firmware_v1_5_0.fw:vendor/firmware/cpp_firmware_v1_5_0.fw
 
 # Firmware (GPU) - from PAN
 vendor/firmware/a506_zap.b00
@@ -99,8 +176,13 @@ vendor/firmware/venus.mdt
 system/framework/com.qualcomm.qti.uceservice-V2.0-java.jar:system_ext/framework/com.qualcomm.qti.uceservice-V2.0-java.jar
 -system/lib64/com.qualcomm.qti.uceservice@2.0.so:system_ext/lib64/com.qualcomm.qti.uceservice@2.0.so;DISABLE_DEPS
 
-# Keystore - from olive
+# Keystore - KM1 blob from olive, QTI HIDL wrapper from pepito stock AML0
 -vendor/lib64/hw/keystore.msm8937.so;DISABLE_DEPS
+-vendor/bin/hw/android.hardware.keymaster@3.0-service-qti;DISABLE_DEPS;MODULE=android.hardware.keymaster@3.0-service-qti
+-vendor/lib64/hw/android.hardware.keymaster@3.0-impl-qti.so;DISABLE_DEPS;MODULE=android.hardware.keymaster@3.0-impl-qti
+-vendor/lib64/libkeymasterdeviceutils.so;DISABLE_DEPS
+-vendor/lib64/libkeymasterutils.so;DISABLE_DEPS
+vendor/etc/init/android.hardware.keymaster@3.0-service-qti.rc
 
 # QSEE userspace stack - from nightly
 # qseecomd handles TrustZone listener callbacks (RPMB, SSD, secureui, etc.)
@@ -144,13 +226,14 @@ vendor/etc/perf/targetresourceconfigs.xml
 vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config.xml|b87b057d87139c7ac866dc5f75c498de1e8ab361
 
 # Sensors - from PAN
--vendor/bin/sensors.qti;DISABLE_DEPS
+-vendor/bin/sensors.qcom:vendor/bin/sensors.qti;DISABLE_DEPS
 -vendor/lib/libsensor1.so;DISABLE_DEPS
 -vendor/lib64/libsensor1.so;DISABLE_DEPS
 
-# Sensors (SSC) - from daisy
+# Sensors (SSC) - from PAN
 -vendor/lib64/libsensor_reg.so;DISABLE_DEPS
 -vendor/lib64/sensors.ssc.so;DISABLE_DEPS
+-vendor/lib64/sensors.native.so;DISABLE_DEPS
 
 # ADSP RPC + audio core - from nightly
 # adsprpcd handles audio/sensors DSP communication; audio HAL needs the
@@ -174,6 +257,22 @@ vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config
 -vendor/bin/ATFWD-daemon;DISABLE_DEPS
 -vendor/bin/ssr_diag;DISABLE_DEPS
 -vendor/bin/ssr_setup;DISABLE_DEPS
+
+# Stock pepito RIL loader / legacy QMI path - from AML0
+# The stock Android 8.1 vendor uses rild + libril-qc-qmi-1 over SMD/QMUX.
+-vendor/bin/hw/rild;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/libril-qc-qmi-1.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/libril-qc-radioconfig.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/libril-qc-ltedirectdisc.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/libril-qcril-hook-oem.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/vendor.qti.hardware.radio.am@1.0_vendor.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/vendor.qti.hardware.radio.ims@1.0_vendor.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/vendor.qti.hardware.radio.lpa@1.0_vendor.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/vendor.qti.hardware.radio.qcrilhook@1.0_vendor.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/vendor.qti.hardware.radio.qtiradio@1.0_vendor.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/vendor.qti.hardware.radio.uim@1.0_vendor.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/vendor.qti.hardware.radio.uim_remote_client@1.0_vendor.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
+-vendor/lib64/vendor.qti.hardware.radio.uim_remote_server@1.0_vendor.so;DISABLE_DEPS;MODULE_SUFFIX=_pepito_stock
 
 # qcrild + QMI / RIL framework - from nightly
 # qcrild is a thin dlopen launcher; libril-qc-hal-qmi.so is the real implementation.
