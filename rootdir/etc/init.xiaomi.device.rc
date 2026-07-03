@@ -45,7 +45,7 @@ service vendor.qcamerasvr /odm/bin/mm-qcamera-daemon
     disabled
 
 on property:ro.vendor.xiaomi.device=pepito
-    setprop ro.hardware.camera msm8937
+    setprop ro.hardware.camera pepito
     setprop persist.radio.multisim.config ssss
     setprop persist.camera.gyro.disable 1
     setprop persist.vendor.camera.eis.enable 0
