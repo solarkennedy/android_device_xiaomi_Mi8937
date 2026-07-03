@@ -85,8 +85,18 @@ PRODUCT_COPY_FILES += \
 #     camera.land
 # endif
 
-# Pepito uses the stock AML0 camera.msm8937 HAL through the pepito overlayfs.
-# The source-built camera.pepito path reaches the daemon but fails IMGLIB startup.
+# Pepito camera HAL — source-built camera.pepito (QCamera2 HAL3). Live preview +
+# capture verified 2026-07-02 (see PLAN-camera.md). Its shared_libs
+# (libPmcamera_interface, libPmjpeg_interface, libPomx_core) install alongside it to
+# /vendor/odm/lib automatically. The provider is pointed at it via
+# ro.hardware.camera=pepito (rootdir/etc/init.xiaomi.device.rc). The stock AML0
+# camera.msm8937.so blob is no longer loaded (still staged in the pepito overlay as
+# dead weight; retire pepito_camera_msm8937 + libVDBeautyShotAPI + the linker fragment
+# below as a follow-up once the clean-build camera is confirmed).
+# TODO(layering): gate behind TARGET_DEVICE_PEPITO once wired — sibling Mi8937
+# variants select their own camera.<variant>.
+PRODUCT_PACKAGES += \
+    camera.pepito
 
 # Dumpstate
 PRODUCT_PACKAGES += \
@@ -221,3 +231,10 @@ $(call inherit-product, vendor/xiaomi/Mi8917/Mi8917-vendor.mk)
 else ifeq ($(PRODUCT_HARDWARE),Mi8937)
 $(call inherit-product, vendor/xiaomi/Mi8937/Mi8937-vendor.mk)
 endif
+
+# Pepito-specific hals.conf adds sensors.native.so (BST BHy HAL) alongside the
+# SSC sub-HAL.  This overrides the mithorium-common base which only has sensors.ssc.so.
+# sensors.native.so is only installed for this build (Mi8937-vendor.mk), so other
+# variants picking up this file would get a harmless "not found" warning from multihal.
+PRODUCT_COPY_FILES += \
+    device/xiaomi/Mi8937/configs/sensors/hals.conf:$(TARGET_COPY_OUT_VENDOR)/etc/sensors/hals.conf
