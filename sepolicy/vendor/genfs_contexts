@@ -53,6 +53,10 @@ genfscon sysfs /devices/platform/soc/7900000.qcom,ipa/wakeup/wakeup			u:object_r
 genfscon sysfs /devices/platform/soc/soc:fpc1020/wakeup/wakeup				u:object_r:sysfs_wakeup:s0
 genfscon sysfs /devices/platform/soc/soc:usb_power_supply/power_supply/usb/wakeup	u:object_r:sysfs_wakeup:s0
 
+# BHy sensor hub (pepito) — i2c-2 address 0x28
+genfscon sysfs /devices/platform/soc/78b6000.i2c/i2c-2/2-0028			u:object_r:sysfs_bhy:s0
+genfscon sysfs /devices/platform/soc/78b6000.i2c/i2c-2/2-0028/wakeup		u:object_r:sysfs_wakeup:s0
+
 # Kernel 4.19 - Wakeup - Power supply - ulysse
 genfscon sysfs /devices/platform/soc/78b6000.i2c/i2c-2/2-0055/power_supply/bms/wakeup		u:object_r:sysfs_wakeup:s0
 genfscon sysfs /devices/platform/soc/78b6000.i2c/i2c-2/2-0055/wakeup/wakeup			u:object_r:sysfs_wakeup:s0

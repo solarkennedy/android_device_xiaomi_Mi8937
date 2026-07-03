@@ -1,3 +1,6 @@
+# BHy sensor hub sysfs
+type sysfs_bhy, fs_type, sysfs_type;
+
 # Camera
 type sysfs_camera_fusion_id, fs_type, sysfs_type;
 
