@@ -1896,21 +1896,46 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                 analysisFeatureMask,
                 &analysisInfo);
         if (ret == NO_ERROR) {
-            mAnalysisChannel = new QCamera3SupportChannel(
-                    mCameraHandle->camera_handle,
-                    mChannelHandle,
-                    mCameraHandle->ops,
-                    &analysisInfo.analysis_padding_info,
-                    analysisFeatureMask,
-                    CAM_STREAM_TYPE_ANALYSIS,
-                    &analysisInfo.analysis_max_res,
-                    (analysisInfo.analysis_format
-                    == CAM_FORMAT_Y_ONLY ? CAM_FORMAT_Y_ONLY
-                    : CAM_FORMAT_YUV_420_NV21),
-                    analysisInfo.hw_analysis_supported,
-                    gCamCapability[mCameraId]->color_arrangement,
-                    this,
-                    0); // force buffer count to 0
+            // [PEPITO-ANALYSIS] The stock A8 mm-qcamera-daemon reports analysis_info
+            // as valid but with a 0x0 recommended/max resolution on pepito. That 0x0
+            // then flows to the CAM_STREAM_TYPE_ANALYSIS stream size (see the
+            // mStreamConfigInfo.stream_sizes assignment ~line 2295), so the backend
+            // receives an analysis stream at 0x0 -> isp_util_handle_stream_info
+            // "failed: stream mapping" -> iface_util_find_primary_cid cannot find a
+            // primary sensor format -> isp_handler_create_internal_link /
+            // iface_reserve_src_port fail -> processCaptureRequest Channel init -1 ->
+            // -38 and the whole session is torn down. Skip the analysis stream when
+            // the backend gives us no usable resolution (loses SW face-detect only;
+            // preview/capture unblocked).
+            LOGE("[PEPITO-ANALYSIS] getAnalysisInfo ok: valid=%d max_res=%dx%d "
+                    "recommended=%dx%d hw=%d",
+                    analysisInfo.valid,
+                    analysisInfo.analysis_max_res.width,
+                    analysisInfo.analysis_max_res.height,
+                    analysisInfo.analysis_recommended_res.width,
+                    analysisInfo.analysis_recommended_res.height,
+                    analysisInfo.hw_analysis_supported);
+            if (analysisInfo.analysis_max_res.width == 0 ||
+                    analysisInfo.analysis_max_res.height == 0) {
+                LOGE("[PEPITO-ANALYSIS] skipping analysis stream (0x0 resolution "
+                        "from backend) to avoid daemon stream-mapping failure");
+            } else {
+                mAnalysisChannel = new QCamera3SupportChannel(
+                        mCameraHandle->camera_handle,
+                        mChannelHandle,
+                        mCameraHandle->ops,
+                        &analysisInfo.analysis_padding_info,
+                        analysisFeatureMask,
+                        CAM_STREAM_TYPE_ANALYSIS,
+                        &analysisInfo.analysis_max_res,
+                        (analysisInfo.analysis_format
+                        == CAM_FORMAT_Y_ONLY ? CAM_FORMAT_Y_ONLY
+                        : CAM_FORMAT_YUV_420_NV21),
+                        analysisInfo.hw_analysis_supported,
+                        gCamCapability[mCameraId]->color_arrangement,
+                        this,
+                        0); // force buffer count to 0
+            }
         } else {
             LOGW("getAnalysisInfo failed, ret = %d", ret);
         }
