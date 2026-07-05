@@ -19,7 +19,6 @@ vendor/etc/diracmobile.config|b99e9492e77e52ca3a511feae0409d59f6aebb87
 
 # Camera stack (pepito) - from Palm PVG100 stock AML0
 -bin/mm-qcamera-daemon:vendor/bin/overlayfs/pepito/mm-qcamera-daemon;DISABLE_DEPS;MODULE=pepito_mm-qcamera-daemon
--lib/hw/camera.msm8937.so:vendor/lib/overlayfs/pepito/hw/camera.msm8937.so;DISABLE_DEPS;MODULE=pepito_camera_msm8937
 -lib/libcamera_imgproc.so:vendor/lib/overlayfs/pepito/libcamera_imgproc.so;DISABLE_DEPS;MODULE=pepito_libcamera_imgproc
 -lib/libmmcamera_interface.so:vendor/lib/overlayfs/pepito/libmmcamera_interface.so;DISABLE_DEPS;MODULE=pepito_libmmcamera_interface
 -lib/libmmjpeg_interface.so:vendor/lib/overlayfs/pepito/libmmjpeg_interface.so;DISABLE_DEPS;MODULE=pepito_libmmjpeg_interface
@@ -28,7 +27,6 @@ vendor/etc/diracmobile.config|b99e9492e77e52ca3a511feae0409d59f6aebb87
 -lib/libTsProcess.so:vendor/lib/overlayfs/pepito/libTsProcess.so;DISABLE_DEPS;MODULE=pepito_libTsProcess
 # libstdc++.so: stock 8.1 minimal C++ runtime stub (from system.bin, not vendor.bin); pinned. Needed by libTsProcess.so; system libstdc++ is not exposed to the vendor linker namespace, so it is bundled into the overlay instead.
 -lib/libstdc++.so:vendor/lib/overlayfs/pepito/libstdc++.so;DISABLE_DEPS;MODULE=pepito_libstdcpp
--lib/libVDBeautyShotAPI.so:vendor/lib/overlayfs/pepito/libVDBeautyShotAPI.so;DISABLE_DEPS;MODULE=pepito_libVDBeautyShotAPI
 -vendor/lib/libactuator_dw9800.so:vendor/lib/overlayfs/pepito/libactuator_dw9800.so;DISABLE_DEPS;MODULE=pepito_libactuator_dw9800
 -vendor/lib/libchromaflash.so:vendor/lib/overlayfs/pepito/libchromaflash.so;DISABLE_DEPS;MODULE=pepito_libchromaflash
 -vendor/lib/libhdr_tm.so:vendor/lib/overlayfs/pepito/libhdr_tm.so;DISABLE_DEPS;MODULE=pepito_libhdr_tm
@@ -225,8 +223,8 @@ vendor/etc/perf/targetresourceconfigs.xml
 # RIL (Data) - Netmgrd - from PAN
 vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config.xml|b87b057d87139c7ac866dc5f75c498de1e8ab361
 
-# Sensors - from PAN
--vendor/bin/sensors.qcom:vendor/bin/sensors.qti;DISABLE_DEPS
+# Sensors - from PAN (libsensor1 = QMI client inside sensors.ssc.so; the
+# stock sensors.qcom daemon is NOT packaged — the SSC HAL talks QMI directly)
 -vendor/lib/libsensor1.so;DISABLE_DEPS
 -vendor/lib64/libsensor1.so;DISABLE_DEPS
 
