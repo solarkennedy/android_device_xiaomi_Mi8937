@@ -65,6 +65,12 @@ PRODUCT_COPY_FILES += \
     $(call find-copy-subdir-files,*.xml,$(LOCAL_PATH)/audio/platform_info/,$(TARGET_COPY_OUT_VENDOR)/etc/) \
     $(call find-copy-subdir-files,*,$(LOCAL_PATH)/audio/acdbdata/pepito/,$(TARGET_COPY_OUT_VENDOR)/etc/acdbdata/pepito/)
 
+# pepito speaker smart-amp (NXP TFA9896) DSP tuning container. Installed as the
+# tfa98xx driver's default fw_name (tfa98xx.cnt), which it request_firmware()s
+# from /vendor/firmware. This is the original Palm PVG100 tuning from stock A8.1.
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/audio/tfa/tfa9896.cnt:$(TARGET_COPY_OUT_VENDOR)/firmware/tfa98xx.cnt
+
 # Camera
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_ODM)/bin/mm-qcamera-daemon \
@@ -127,6 +133,18 @@ ifeq ($(TARGET_DEVICE_PEPITO),true)
 PRODUCT_SYSTEM_PROPERTIES += \
     ro.keymaster.xxx.release=8.1.0 \
     ro.keymaster.xxx.security_patch=2020-09-01
+
+# Compressed hardware offload hard-fails on this ADSP: the DSP rejects
+# ASM_STREAM_CMD_OPEN_WRITE_V3 with ADSP_EFAILED, so any app that requests
+# offload (e.g. Twelve, which defaults enableOffload=true) sees AudioTrack
+# ERROR_DEAD_OBJECT and dies. Force all playback onto the working PCM path.
+# Verified live: setprop audio.offload.disable 1 + audioserver restart made
+# Twelve play the low-latency-playback usecase with no errors.
+# NOTE: this does NOT make the speaker audible on its own — pepito's speaker is
+# driven by an external NXP TFA9896 smart-amp that is not yet brought up in this
+# build (see PLAN-audio.md "External speaker amp (TFA9896)").
+PRODUCT_SYSTEM_PROPERTIES += \
+    audio.offload.disable=1
 endif
 
 # Fingerprint

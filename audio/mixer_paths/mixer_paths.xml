@@ -93,16 +93,16 @@
     <ctl name="DEC4 MUX" value="ZERO" />
     <ctl name="SpkrMono VISENSE Switch" value="0" />
 
-    <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia1" value="0" />
+    <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia1" value="0" />
     <ctl name="INTERNAL_BT_SCO_RX Audio Mixer MultiMedia1" value="0" />
-    <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia3" value="0" />
+    <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia3" value="0" />
     <ctl name="INTERNAL_BT_SCO_RX Audio Mixer MultiMedia3" value="0" />
     <ctl name="AFE_PCM_RX Audio Mixer MultiMedia3" value="0" />
-    <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia4" value="0" />
+    <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia4" value="0" />
     <ctl name="INTERNAL_BT_SCO_RX Audio Mixer MultiMedia4" value="0" />
     <ctl name="AFE_PCM_RX Audio Mixer MultiMedia4" value="0" />
     <ctl name="INTERNAL_FM_RX Audio Mixer MultiMedia4" value="0" />
-    <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia5" value="0" />
+    <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia5" value="0" />
     <ctl name="INTERNAL_BT_SCO_RX Audio Mixer MultiMedia5" value="0" />
     <ctl name="MultiMedia1 Mixer TERT_MI2S_TX" value="0" />
     <ctl name="MultiMedia5 Mixer TERT_MI2S_TX" value="0" />
@@ -240,7 +240,7 @@
 
     <!-- These are audio route (FE to BE) specific mixer settings -->
     <path name="deep-buffer-playback">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia1" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia1" value="1" />
     </path>
 
     <path name="deep-buffer-playback bt-sco">
@@ -270,7 +270,7 @@
     </path>
 
     <path name="low-latency-playback">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia5" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia5" value="1" />
     </path>
 
     <path name="low-latency-playback speaker-protected">
@@ -304,7 +304,7 @@
     </path>
 
     <path name="audio-ull-playback">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia3" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia3" value="1" />
     </path>
 
     <path name="audio-ull-playback headphones">
@@ -338,7 +338,7 @@
     </path>
 
     <path name="compress-offload-playback">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia4" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia4" value="1" />
     </path>
 
     <path name="compress-offload-playback speaker-protected">
@@ -367,7 +367,7 @@
     </path>
 
     <path name="compress-offload-playback2">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia7" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia7" value="1" />
     </path>
 
     <path name="compress-offload-playback2 bt-sco">
@@ -379,7 +379,7 @@
     </path>
 
     <path name="compress-offload-playback3">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia10" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia10" value="1" />
     </path>
 
     <path name="compress-offload-playback3 bt-sco">
@@ -387,7 +387,7 @@
     </path>
 
     <path name="compress-offload-playback4">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia11" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia11" value="1" />
     </path>
 
     <path name="compress-offload-playback4 bt-sco">
@@ -395,7 +395,7 @@
     </path>
 
     <path name="compress-offload-playback5">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia12" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia12" value="1" />
     </path>
 
     <path name="compress-offload-playback5 bt-sco">
@@ -403,7 +403,7 @@
     </path>
 
     <path name="compress-offload-playback6">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia13" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia13" value="1" />
     </path>
 
     <path name="compress-offload-playback6 bt-sco">
@@ -411,7 +411,7 @@
     </path>
 
     <path name="compress-offload-playback7">
-        <ctl name="PRI_MI2S_RX Audio Mixer MultiMedia14" value="1" />
+        <ctl name="QUAT_MI2S_RX Audio Mixer MultiMedia14" value="1" />
     </path>
 
     <path name="compress-offload-playback7 bt-sco">
@@ -850,8 +850,8 @@
     </path>
 
     <path name="speaker">
-        <ctl name="RX3 MIX1 INP1" value="RX1" />
-        <ctl name="SPK" value="Switch" />
+        <ctl name="TFA9896 Profile" value="Music" />
+        <ctl name="TFA9896 Rec GPIO" value="Off" />
     </path>
 
     <path name="wsa-speaker">
