@@ -1,7 +1,7 @@
 package org.lineageos.pepito.volumetile;
 
+import android.app.StatusBarManager;
 import android.media.AudioManager;
-import android.content.Intent;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
 
@@ -22,6 +22,12 @@ public class VolumeTile extends TileService {
         if (am != null) {
             am.adjustVolume(AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI);
         }
-        sendBroadcast(new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+        // Collapse only the shade. ACTION_CLOSE_SYSTEM_DIALOGS would (a) throw
+        // SecurityException for targetSdk S+ without BROADCAST_CLOSE_SYSTEM_DIALOGS
+        // and (b) dismiss the volume dialog we just requested.
+        StatusBarManager sbm = getSystemService(StatusBarManager.class);
+        if (sbm != null) {
+            sbm.collapsePanels();
+        }
     }
 }
