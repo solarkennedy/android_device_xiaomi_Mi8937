@@ -2,6 +2,8 @@
     package="org.lineageos.pepito.volumetile">
 
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- signature-granted (platform cert); needed for StatusBarManager.collapsePanels() -->
+    <uses-permission android:name="android.permission.STATUS_BAR" />
 
     <application
         android:label="@string/volume_tile_label">
