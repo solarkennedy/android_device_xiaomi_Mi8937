@@ -52,6 +52,10 @@ PRODUCT_PACKAGES += \
     VolumeTile \
     xiaomi_pepito_overlay \
     xiaomi_pepito_overlay_systemui
+
+# Allowlist VolumeTile's signature|privileged STATUS_BAR permission (see the xml).
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/permissions/privapp-permissions-pepito.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/privapp-permissions-pepito.xml
 endif
 endif
 
@@ -91,14 +95,14 @@ PRODUCT_COPY_FILES += \
 #     camera.land
 # endif
 
-# Pepito camera HAL — source-built camera.pepito (QCamera2 HAL3). Live preview +
-# capture verified 2026-07-02 (see PLAN-camera.md). Its shared_libs
-# (libPmcamera_interface, libPmjpeg_interface, libPomx_core) install alongside it to
-# /vendor/odm/lib automatically. The provider is pointed at it via
-# ro.hardware.camera=pepito (rootdir/etc/init.xiaomi.device.rc). The stock AML0
-# camera.msm8937.so blob is no longer loaded (still staged in the pepito overlay as
-# dead weight; retire pepito_camera_msm8937 + libVDBeautyShotAPI + the linker fragment
-# below as a follow-up once the clean-build camera is confirmed).
+# Pepito camera HAL — source-built camera.pepito (QCamera2 HAL3). Preview + JPEG
+# still-capture verified on both cameras 2026-07-03 (see PLAN-camera.md). Its
+# shared_libs (libPmcamera_interface, libPmjpeg_interface, libPomx_core) install
+# alongside it to /vendor/odm/lib automatically; the JPEG OMX encoder blobs
+# (pepito_libqomx_jpegenc + deps) come from the vendor tree. The provider is
+# pointed at it via ro.hardware.camera=pepito (rootdir/etc/init.xiaomi.device.rc).
+# The stock AML0 camera.msm8937.so blob (+ libVDBeautyShotAPI + its linker
+# fragment) was retired 2026-07-03.
 # TODO(layering): gate behind TARGET_DEVICE_PEPITO once wired — sibling Mi8937
 # variants select their own camera.<variant>.
 PRODUCT_PACKAGES += \
@@ -107,11 +111,6 @@ PRODUCT_PACKAGES += \
 # Dumpstate
 PRODUCT_PACKAGES += \
     libdumpstate_device
-
-# Linker config — expose libandroid.so and libjnigraphics.so to vendor namespace
-# Required by libVDBeautyShotAPI.so (DT_NEEDED by camera.msm8937.so)
-PRODUCT_VENDOR_LINKER_CONFIG_FRAGMENTS += \
-    device/xiaomi/Mi8937/configs/linker.config.json
 
 # Filesystem
 PRODUCT_PACKAGES += \
@@ -256,3 +255,28 @@ endif
 # variants picking up this file would get a harmless "not found" warning from multihal.
 PRODUCT_COPY_FILES += \
     device/xiaomi/Mi8937/configs/sensors/hals.conf:$(TARGET_COPY_OUT_VENDOR)/etc/sensors/hals.conf
+
+# qmux legacy-IPC modem path (pepito bring-up) — stock A8 rmt_storage + its
+# private A8 vendor-lib closure (isolated under lib64/qmux, loaded via
+# LD_LIBRARY_PATH so they never shadow the A15 vendor libs), a flip script,
+# and a default-OFF init hook (persist.vendor.qmux.enable). See PLAN-qmux.md.
+ifeq ($(PRODUCT_HARDWARE),Mi8937)
+PRODUCT_COPY_FILES += \
+    device/xiaomi/Mi8937/qmux/bin/qmux_rmt_storage:$(TARGET_COPY_OUT_VENDOR)/bin/qmux_rmt_storage \
+    device/xiaomi/Mi8937/qmux/bin/qmux-flip-on.sh:$(TARGET_COPY_OUT_VENDOR)/bin/qmux-flip-on.sh \
+    device/xiaomi/Mi8937/qmux/init.qmux.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/init.qmux.rc \
+    device/xiaomi/Mi8937/qmux/lib64/libCheckTunning.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libCheckTunning.so \
+    device/xiaomi/Mi8937/qmux/lib64/libJrdQmi.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libJrdQmi.so \
+    device/xiaomi/Mi8937/qmux/lib64/libbackuptunning.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libbackuptunning.so \
+    device/xiaomi/Mi8937/qmux/lib64/libdiag.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libdiag.so \
+    device/xiaomi/Mi8937/qmux/lib64/libdsutils.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libdsutils.so \
+    device/xiaomi/Mi8937/qmux/lib64/libidl.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libidl.so \
+    device/xiaomi/Mi8937/qmux/lib64/libmdmdetect.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libmdmdetect.so \
+    device/xiaomi/Mi8937/qmux/lib64/libqmi_cci.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libqmi_cci.so \
+    device/xiaomi/Mi8937/qmux/lib64/libqmi_client_qmux.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libqmi_client_qmux.so \
+    device/xiaomi/Mi8937/qmux/lib64/libqmi_common_so.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libqmi_common_so.so \
+    device/xiaomi/Mi8937/qmux/lib64/libqmi_csi.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libqmi_csi.so \
+    device/xiaomi/Mi8937/qmux/lib64/libqmi_encdec.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libqmi_encdec.so \
+    device/xiaomi/Mi8937/qmux/lib64/libqmiservices.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libqmiservices.so \
+    device/xiaomi/Mi8937/qmux/lib64/libsmemlog.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libsmemlog.so
+endif

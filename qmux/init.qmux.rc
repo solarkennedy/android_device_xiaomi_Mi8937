@@ -1,0 +1,12 @@
+# init.qmux.rc — qmux legacy-IPC modem path (pepito bring-up).
+#
+# DEFAULT-OFF: nothing here changes boot unless persist.vendor.qmux.enable=1
+# is set. When set, on the next boot the flip script runs once the nightly
+# rmt_storage is up, establishing the WIN state (stock rmt_storage on
+# ipc_router + modem edge on the rpmsg xprt). This is the runtime path;
+# true cold-boot-during-kernel-init still needs the xprt enabled before the
+# modem channel probes (bootarg ipc_router_rpmsg_xprt.enable=1) + early
+# stock rmt_storage — tuned separately.
+
+on property:persist.vendor.qmux.enable=1 && property:init.svc.vendor.rmt_storage=running
+    exec_background u:r:su:s0 root -- /vendor/bin/qmux-flip-on.sh
