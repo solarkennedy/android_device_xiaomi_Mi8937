@@ -54,3 +54,10 @@ else
 	echo "qcrild launched with force-ipcr preload"
 fi
 echo "(SIM/registration via: getprop gsm.sim.state / logcat -b radio)"
+
+# GPS: the gnss HAL (lazy, on-demand) reads this at launch and preloads the
+# same force-ipcr shim so its loc_api_v02/libqmi_cci client binds QMI_LOC
+# (svc 16) on the ipc_router bus. Pepito-only; the shared gnss rc defaults it
+# empty on other variants. persist so it is set before a location request
+# starts the HAL.
+setprop persist.vendor.qmux.gnss_preload libqmi_force_ipcr.so
