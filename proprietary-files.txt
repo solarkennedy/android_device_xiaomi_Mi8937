@@ -277,7 +277,6 @@ vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config
 # android.hardware.radio.c_shim@1.0-1.2 patches the HIDL descriptor so qcrild
 # registers under lineage.hardware.radio.config namespace (built from source).
 -vendor/bin/hw/qcrild;DISABLE_DEPS
--vendor/etc/init/qcrild.rc
 -vendor/lib64/libril-qc-hal-qmi.so;DISABLE_DEPS
 -vendor/lib64/libril-qc-logger.so;DISABLE_DEPS
 -vendor/lib64/librilqmiservices.so;DISABLE_DEPS

@@ -1,0 +1,31 @@
+# qcrild.rc — [qmux] device-tree override of the vendor blob (removed from
+# proprietary-files.txt). Only change vs stock: `setenv LD_PRELOAD
+# libqmi_force_ipcr.so` on each qcrild instance, which forces libqmi_cci onto
+# its native IPC-Router backend so qcrild reaches the pepito A8 modem (which
+# lives on ipc_router, not QRTR — see PLAN-qmux.md / PLAN-qmux-bridge.md).
+# Services stay `disabled`; they are started only after the modem is in the
+# ipcr-healthy WIN state (qmux-flip-on.sh / persist.vendor.radio.autostart).
+
+service vendor.qcrild /vendor/bin/hw/qcrild
+    class main
+    user radio
+    group radio cache inet misc audio log readproc wakelock oem_2901
+    capabilities BLOCK_SUSPEND NET_ADMIN NET_RAW
+    setenv LD_PRELOAD libqmi_force_ipcr.so
+    disabled
+
+service vendor.qcrild2 /vendor/bin/hw/qcrild -c 2
+    class main
+    user radio
+    group radio cache inet misc audio log readproc wakelock oem_2901
+    capabilities BLOCK_SUSPEND NET_ADMIN NET_RAW
+    setenv LD_PRELOAD libqmi_force_ipcr.so
+    disabled
+
+service vendor.qcrild3 /vendor/bin/hw/qcrild -c 3
+    class main
+    user radio
+    group radio cache inet misc audio log readproc wakelock oem_2901
+    capabilities BLOCK_SUSPEND NET_ADMIN NET_RAW
+    setenv LD_PRELOAD libqmi_force_ipcr.so
+    disabled
