@@ -1907,6 +1907,9 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
             // -38 and the whole session is torn down. Skip the analysis stream when
             // the backend gives us no usable resolution (loses SW face-detect only;
             // preview/capture unblocked).
+            // NOTE: QCameraCommon::getAnalysisInfo now substitutes 640x480 for the
+            // 0x0 backend value (persist.vendor.camera.analysis.subst, default on),
+            // so this guard only triggers with the substitution prop set to 0.
             LOGE("[PEPITO-ANALYSIS] getAnalysisInfo ok: valid=%d max_res=%dx%d "
                     "recommended=%dx%d hw=%d",
                     analysisInfo.valid,
