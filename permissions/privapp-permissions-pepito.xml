@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<permissions>
+    <!-- VolumeTile is a privileged system app; STATUS_BAR is signature|privileged
+         and must be allowlisted or PermissionManagerService kills system_server at
+         onSystemReady (bootloop). MODIFY_AUDIO_SETTINGS is normal, no entry needed. -->
+    <privapp-permissions package="org.lineageos.pepito.volumetile">
+        <permission name="android.permission.STATUS_BAR"/>
+    </privapp-permissions>
+</permissions>
