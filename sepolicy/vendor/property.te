@@ -1,0 +1,3 @@
+# Pepito: version props read by the property-spoofed stock QTI keymaster
+# wrapper during configure (see device.mk ro.keymaster.xxx.* block).
+vendor_internal_prop(vendor_pepito_keymaster_prop);

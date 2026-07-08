@@ -1,3 +1,6 @@
 # Camera - ugg
 persist.s5k3p8sp.		u:object_r:camera_prop:s0
 persist.ov16885.		u:object_r:camera_prop:s0
+
+# Pepito keymaster version spoof (read by hal_keymaster_qti)
+ro.keymaster.xxx.		u:object_r:vendor_pepito_keymaster_prop:s0

@@ -1,0 +1,2 @@
+# Pepito stock QTI keymaster wrapper reads the spoofed version props.
+get_prop(hal_keymaster_qti, vendor_pepito_keymaster_prop)

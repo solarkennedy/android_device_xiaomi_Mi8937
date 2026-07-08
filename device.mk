@@ -128,8 +128,9 @@ PRODUCT_PRODUCT_PROPERTIES += \
 ifeq ($(TARGET_DEVICE_PEPITO),true)
 # Pepito's stock QTI keymaster wrapper rejects Android 16 OS version tags during
 # configure. The blob is patched to read these stock-compatible values instead
-# of ro.build.version.* for the configure command.
-PRODUCT_SYSTEM_PROPERTIES += \
+# of ro.build.version.* for the configure command. Vendor props (they configure
+# a vendor blob); labeled vendor_pepito_keymaster_prop for hal_keymaster_qti.
+PRODUCT_VENDOR_PROPERTIES += \
     ro.keymaster.xxx.release=8.1.0 \
     ro.keymaster.xxx.security_patch=2020-09-01
 
@@ -190,24 +191,16 @@ PRODUCT_PACKAGES += \
     init.xiaomi.device.sh
 
 ifeq ($(TARGET_DEVICE_PEPITO),true)
+# Stock QTI keymaster HIDL wrapper (property-spoofed configure; see
+# ro.keymaster.xxx.* above). The QSEE keymaster TA itself is APPSBL/TZ-preloaded
+# as keymaster64 and aliased in the kernel qseecom driver — no trustlet files
+# are loaded from the filesystem, so no firmware staging/mirror is needed.
 PRODUCT_PACKAGES += \
-    init.pepito.qseecom.rc \
-    init.pepito.qseecom.sh \
     android.hardware.keymaster@3.0-service-qti \
     android.hardware.keymaster@3.0-impl-qti \
     android.hardware.keymaster@3.0.vendor \
     libkeymasterdeviceutils \
     libkeymasterutils
-
-PRODUCT_COPY_FILES += \
-    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b00:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b00 \
-    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b01:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b01 \
-    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b02:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b02 \
-    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b03:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b03 \
-    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b04:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b04 \
-    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b05:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b05 \
-    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.b06:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.b06 \
-    vendor/xiaomi/Mi8937/proprietary/vendor/etc/keymaster-firmware/keymaster.mdt:$(TARGET_COPY_OUT_VENDOR)/etc/keymaster-firmware/keymaster.mdt
 endif
 
 ifeq ($(PRODUCT_HARDWARE),Mi8937)
