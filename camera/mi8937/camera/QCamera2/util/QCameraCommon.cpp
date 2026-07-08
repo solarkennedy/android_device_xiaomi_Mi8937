@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <log/log.h>
+#include <cutils/properties.h>
 
 // Camera dependencies
 #include "QCameraCommon.h"
@@ -217,6 +218,40 @@ int32_t QCameraCommon::getAnalysisInfo(
 
             pAnalysisInfo->hw_analysis_supported |=
                 pPaafInfo->hw_analysis_supported;
+        }
+    }
+
+    // [PEPITO-ANALYSIS] The stock Palm A8 daemon reports analysis_info entries
+    // as valid but with a 0x0 recommended/max resolution (and zero padding). A
+    // 0x0 analysis stream kills the whole session in the daemon
+    // (isp_util_handle_stream_info "stream mapping" -> find_primary_cid
+    // cascade), and dropping the stream (the callers skip 0x0) costs SW
+    // face-detect. Substitute a standard VGA analysis resolution + sane padding
+    // here so every consumer (channel creation AND meta stream info) sees the
+    // same fixed-up values. Runtime escape hatch if the daemon rejects the
+    // substituted stream: setprop persist.vendor.camera.analysis.subst 0
+    // restores the drop-the-stream behavior.
+    if (pAnalysisInfo->valid &&
+            (pAnalysisInfo->analysis_max_res.width == 0 ||
+             pAnalysisInfo->analysis_max_res.height == 0)) {
+        char prop[PROPERTY_VALUE_MAX];
+        memset(prop, 0, sizeof(prop));
+        property_get("persist.vendor.camera.analysis.subst", prop, "1");
+        if (atoi(prop) != 0) {
+            pAnalysisInfo->analysis_max_res.width = 640;
+            pAnalysisInfo->analysis_max_res.height = 480;
+            pAnalysisInfo->analysis_recommended_res.width = 640;
+            pAnalysisInfo->analysis_recommended_res.height = 480;
+            if (pAnalysisInfo->analysis_padding_info.width_padding == 0)
+                pAnalysisInfo->analysis_padding_info.width_padding = CAM_PAD_TO_32;
+            if (pAnalysisInfo->analysis_padding_info.height_padding == 0)
+                pAnalysisInfo->analysis_padding_info.height_padding = CAM_PAD_TO_2;
+            if (pAnalysisInfo->analysis_padding_info.plane_padding == 0)
+                pAnalysisInfo->analysis_padding_info.plane_padding = CAM_PAD_TO_32;
+            ALOGI("[PEPITO-ANALYSIS] backend analysis res was 0x0; substituting "
+                    "640x480 (pad %dx%d) so face-detect can run",
+                    pAnalysisInfo->analysis_padding_info.width_padding,
+                    pAnalysisInfo->analysis_padding_info.height_padding);
         }
     }
 
