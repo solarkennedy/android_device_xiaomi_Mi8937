@@ -1,0 +1,3 @@
+# Pepito: vendor_init sets the keymaster version-spoof props from
+# vendor/build.prop (see device.mk ro.keymaster.xxx.* block).
+set_prop(vendor_init, vendor_pepito_keymaster_prop)
