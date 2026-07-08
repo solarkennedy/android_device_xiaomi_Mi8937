@@ -55,9 +55,9 @@ else
 fi
 echo "(SIM/registration via: getprop gsm.sim.state / logcat -b radio)"
 
-# GPS: the gnss HAL (lazy, on-demand) reads this at launch and preloads the
-# same force-ipcr shim so its loc_api_v02/libqmi_cci client binds QMI_LOC
-# (svc 16) on the ipc_router bus. Pepito-only; the shared gnss rc defaults it
-# empty on other variants. persist so it is set before a location request
-# starts the HAL.
-setprop persist.vendor.qmux.gnss_preload libqmi_force_ipcr.so
+# GPS force-ipcr is intentionally NOT wired here yet. The first attempt (a
+# property-gated setenv in the shared gnss rc) boot-looped the device: init
+# doesn't expand ${property} in setenv, and the shared rc affects all
+# mithorium variants. A boot-safe, pepito-scoped mechanism is TODO
+# (PLAN-qmux-bridge.md) - and it must not let a hung gnss HAL init block
+# system_server at boot.
