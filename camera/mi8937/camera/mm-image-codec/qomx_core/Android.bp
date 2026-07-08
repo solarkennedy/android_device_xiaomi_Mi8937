@@ -1,6 +1,31 @@
 
 
 cc_library_shared {
+    name: "libPomx_core",
+    compile_multilib: "32",
+    cflags: [
+        "-Wno-error",
+        "-g",
+        "-O0",
+        "-DDEVICE_PEPITO",
+    ],
+    include_dirs: ["device/xiaomi/Mi8937/camera/mi8937/camera/mm-image-codec/qexif"],
+    header_libs: [
+        "libutils_headers",
+        "media_plugin_headers",
+    ],
+
+    device_specific: true,
+
+    shared_libs: [
+        "libcutils",
+        "libdl",
+        "liblog",
+    ],
+    srcs: ["qomx_core.c"],
+}
+
+cc_library_shared {
     name: "libWomx_core",
     compile_multilib: "32",
     cflags: [
