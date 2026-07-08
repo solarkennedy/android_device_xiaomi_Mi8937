@@ -17,6 +17,6 @@
 <resources>
     <!-- Default QS tiles set for pepito, including the custom volume quick settings tile -->
     <string name="quick_settings_tiles_new_default" translatable="false">
-        internet,bt,dnd,cast,flashlight,airplane,rotation,wallet,alarm,controls,screenrecord,battery,custom(org.lineageos.pepito.volumetile/.VolumeTile)
+        internet,bt,dnd,flashlight,airplane,rotation,alarm,controls,screenrecord,battery,custom(org.lineageos.pepito.volumetile/.VolumeTile)
     </string>
 </resources>
