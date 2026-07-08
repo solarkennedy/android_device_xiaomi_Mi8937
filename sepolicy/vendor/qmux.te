@@ -17,6 +17,10 @@ allow rmt_storage diag_device:chr_file rw_file_perms;
 # had self:socket ioctl (its QRTR path uses qipcrtr_socket).
 allow rild self:socket create_socket_perms;
 
+# qcrild preloads libqmi_force_ipcr.so, whose socket() shim reads the qmux
+# enable prop in-process to decide whether to force the ipc_router backend.
+get_prop(rild, vendor_qmux_prop)
+
 # NOTE: the flip (qmux-flip-on.sh) still runs in the permissive su domain via
 # init.qmux.rc exec_background. For enforcing, move that logic to a dedicated
 # domain (or into init) and add the setter for vendor_qmux_prop.

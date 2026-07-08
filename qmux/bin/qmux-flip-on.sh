@@ -37,7 +37,7 @@ echo "modem QMI svcs: $(grep -c '0x00000000 |' /sys/kernel/debug/msm_ipc_router/
 start qmux_qcrild
 echo "qmux_qcrild started on ipc_router (SIM/registration via: getprop gsm.sim.state)"
 
-# GPS: the gnss HAL is repointed to /vendor/bin/gnss-qmux-wrapper.sh
-# (mithorium-common gnss rc), which preloads the same shim when qmux is enabled
-# so its loc_api_v02/libqmi_cci binds QMI_LOC (svc 16) on ipc_router. No action
+# GPS: the gnss HAL (mithorium-common gnss rc) unconditionally preloads
+# libqmi_force_ipcr.so; the shim only forces ipc_router when qmux is enabled, so
+# its loc_api_v02/libqmi_cci binds QMI_LOC (svc 16) on ipc_router. No action
 # needed here; the HAL is lazy-started by the location framework.
