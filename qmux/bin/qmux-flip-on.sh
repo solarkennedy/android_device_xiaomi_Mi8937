@@ -31,3 +31,12 @@ sleep 14
 cat /sys/kernel/debug/rmt_storage/info | grep -E "Client_name|Request"
 echo "modem: $(cat /sys/bus/msm_subsys/devices/subsys0/state) cc=$(cat /sys/bus/msm_subsys/devices/subsys0/crash_count)"
 echo "modem QMI svcs: $(grep -c '0x00000000 |' /sys/kernel/debug/msm_ipc_router/dump_servers 2>/dev/null)"
+
+# Modem now healthy on ipc_router → bring up telephony. qcrild carries
+# `setenv LD_PRELOAD libqmi_force_ipcr.so` (qcrild.rc), so libqmi_cci uses its
+# native ipc_router backend and reaches the modem. Started here, AFTER the
+# modem is ipcr-healthy, to satisfy the ordering (qcrild's QMI init must not
+# race the flip).
+setprop persist.vendor.radio.autostart 1
+start vendor.qcrild
+echo "qcrild started on ipc_router (SIM/registration via logcat -b radio)"

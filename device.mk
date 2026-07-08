@@ -278,5 +278,12 @@ PRODUCT_COPY_FILES += \
     device/xiaomi/Mi8937/qmux/lib64/libqmi_csi.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libqmi_csi.so \
     device/xiaomi/Mi8937/qmux/lib64/libqmi_encdec.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libqmi_encdec.so \
     device/xiaomi/Mi8937/qmux/lib64/libqmiservices.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libqmiservices.so \
-    device/xiaomi/Mi8937/qmux/lib64/libsmemlog.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libsmemlog.so
+    device/xiaomi/Mi8937/qmux/lib64/libsmemlog.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libsmemlog.so \
+    device/xiaomi/Mi8937/qmux/qcrild.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/qcrild.rc
+
+# qmux Architecture D: force the A15 QMI stack onto its native ipc_router
+# backend (reaches the pepito modem). qcrild.rc above adds the per-service
+# LD_PRELOAD; this ships the shim. See PLAN-qmux-bridge.md.
+PRODUCT_PACKAGES += \
+    libqmi_force_ipcr
 endif
