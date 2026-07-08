@@ -1,3 +1,10 @@
+# Gatekeeper
+/(vendor|system/vendor)/bin/hw/android\.hardware\.gatekeeper@1\.0-service\.software  u:object_r:hal_gatekeeper_default_exec:s0
+
+# Pepito keymaster trustlet staging for qseecom firmware mirror.
+/(vendor|system/vendor)/bin/init\.pepito\.qseecom\.sh  u:object_r:init_pepito_qseecom_exec:s0
+/(vendor|system/vendor)/etc/keymaster-firmware(/.*)?  u:object_r:firmware_file:s0
+
 # IR
 /dev/spidev7.1	u:object_r:ir_device:s0
 
@@ -11,3 +18,7 @@
 
 # Touchscreen
 /sys/devices(/platform)?/soc/78b7000\.i2c/i2c-3/3-[0-9a-f]+(/.*)?	u:object_r:sysfs_mi8937_ts:s0
+
+# qmux (pepito ipc_router modem transport) — stock A8 rmt_storage runs in the
+# rmt_storage domain; qcrild uses the existing rild domain (rild_exec label).
+/(vendor|system/vendor)/bin/qmux_rmt_storage	u:object_r:rmt_storage_exec:s0

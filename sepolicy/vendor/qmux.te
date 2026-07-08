@@ -1,0 +1,22 @@
+# qmux (pepito) — modem QMI over the legacy IPC Router (AF_MSM_IPC), which maps
+# to the generic 'socket' class on this kernel. See PLAN-qmux.md / PLAN-qmux-bridge.md.
+#
+# qmux_rmt_storage is labeled rmt_storage_exec (file_contexts) so it runs in the
+# rmt_storage domain and inherits its uio/efs/socket perms. Deltas vs the stock
+# QRTR rmt_storage:
+
+# It loads its private A8 QMI lib closure from /vendor/lib64/qmux (vendor_file)
+# plus the vendor libc++ (same_process_hal_file).
+allow rmt_storage vendor_file:file { read getattr open execute map };
+allow rmt_storage same_process_hal_file:file { read getattr open execute map };
+
+# The A8 rmt_storage links libdiag and opens /dev/diag.
+allow rmt_storage diag_device:chr_file rw_file_perms;
+
+# qcrild talks the ipc_router (generic socket) now; the base rild domain only
+# had self:socket ioctl (its QRTR path uses qipcrtr_socket).
+allow rild self:socket create_socket_perms;
+
+# NOTE: the flip (qmux-flip-on.sh) still runs in the permissive su domain via
+# init.qmux.rc exec_background. For enforcing, move that logic to a dedicated
+# domain (or into init) and add the setter for vendor_qmux_prop.
