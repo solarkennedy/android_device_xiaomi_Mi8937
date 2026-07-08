@@ -1,12 +1,31 @@
 # init.qmux.rc — qmux legacy-IPC modem path (pepito bring-up).
 #
-# DEFAULT-OFF: nothing here changes boot unless persist.vendor.qmux.enable=1
-# is set. When set, on the next boot the flip script runs once the nightly
-# rmt_storage is up, establishing the WIN state (stock rmt_storage on
-# ipc_router + modem edge on the rpmsg xprt). This is the runtime path;
-# true cold-boot-during-kernel-init still needs the xprt enabled before the
-# modem channel probes (bootarg ipc_router_rpmsg_xprt.enable=1) + early
-# stock rmt_storage — tuned separately.
+# DEFAULT-OFF: nothing here changes boot unless persist.vendor.qmux.enable=1.
+# When set, on boot the flip script (below) starts the two qmux daemons and
+# flips the modem edge to ipc_router. The daemons are defined here as proper
+# init SERVICES (not backgrounded from the script) — a script that backgrounds
+# them is run via exec_background, whose process group init SIGKILLs on script
+# exit, killing the daemons with it.
+
+# Stock A8 rmt_storage on the legacy IPC Router (serves the modem's RFSA
+# buffer + EFS). Its private A8 lib closure is isolated under /vendor/lib64/qmux.
+service qmux_rmt_storage /vendor/bin/qmux_rmt_storage
+    class core
+    user root
+    setenv LD_LIBRARY_PATH /vendor/lib64/qmux
+    disabled
+
+# qcrild forced onto its native ipc_router QMI backend via the force-ipcr
+# preload (libqmi_cci probes AF_QIPCRTR; the shim fails it -> ipcr). Defined
+# here (not via the vendor qcrild.rc blob, which reverts on extract) so the
+# LD_PRELOAD ships reliably. Mirrors vendor.qcrild's creds.
+service qmux_qcrild /vendor/bin/hw/qcrild
+    class main
+    user radio
+    group radio cache inet misc audio log readproc wakelock oem_2901
+    capabilities BLOCK_SUSPEND NET_ADMIN NET_RAW
+    setenv LD_PRELOAD libqmi_force_ipcr.so
+    disabled
 
 on property:persist.vendor.qmux.enable=1 && property:init.svc.vendor.rmt_storage=running
     exec_background u:r:su:s0 root -- /vendor/bin/qmux-flip-on.sh
