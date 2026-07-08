@@ -32,11 +32,25 @@ cat /sys/kernel/debug/rmt_storage/info | grep -E "Client_name|Request"
 echo "modem: $(cat /sys/bus/msm_subsys/devices/subsys0/state) cc=$(cat /sys/bus/msm_subsys/devices/subsys0/crash_count)"
 echo "modem QMI svcs: $(grep -c '0x00000000 |' /sys/kernel/debug/msm_ipc_router/dump_servers 2>/dev/null)"
 
-# Modem now healthy on ipc_router → bring up telephony. qcrild carries
-# `setenv LD_PRELOAD libqmi_force_ipcr.so` (qcrild.rc), so libqmi_cci uses its
-# native ipc_router backend and reaches the modem. Started here, AFTER the
-# modem is ipcr-healthy, to satisfy the ordering (qcrild's QMI init must not
-# race the flip).
-setprop persist.vendor.radio.autostart 1
-start vendor.qcrild
-echo "qcrild started on ipc_router (SIM/registration via logcat -b radio)"
+# Modem now healthy on ipc_router → bring up telephony. qcrild needs
+# LD_PRELOAD=libqmi_force_ipcr.so so libqmi_cci uses its native ipc_router
+# backend and reaches the modem. Started here, AFTER the modem is ipcr-healthy,
+# so qcrild's QMI init doesn't race the flip.
+#
+# Prefer init (proper radio user + respawn) IF the shipped qcrild.rc carries
+# the setenv; otherwise inject the preload here — robust against the vendor
+# blob overriding our device-tree qcrild.rc (parallel-extract churn).
+if grep -q "libqmi_force_ipcr" /vendor/etc/init/qcrild.rc 2>/dev/null; then
+	setprop persist.vendor.radio.autostart 1
+	start vendor.qcrild
+	echo "qcrild started via init on ipc_router"
+else
+	echo "[qmux] qcrild.rc lacks LD_PRELOAD; launching qcrild with the shim directly"
+	setprop ctl.stop vendor.qcrild 2>/dev/null
+	pkill -9 -f qcrild 2>/dev/null
+	sleep 1
+	setsid env LD_PRELOAD=libqmi_force_ipcr.so /vendor/bin/hw/qcrild </dev/null \
+		>/data/local/tmp/qcrild.out 2>&1 &
+	echo "qcrild launched with force-ipcr preload"
+fi
+echo "(SIM/registration via: getprop gsm.sim.state / logcat -b radio)"
