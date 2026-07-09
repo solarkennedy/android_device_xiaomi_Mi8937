@@ -27,5 +27,65 @@ service qmux_qcrild /vendor/bin/hw/qcrild
     setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled
 
+# IMS daemons (VoLTE) — stock QTI service definitions (names, sockets, prop
+# chain imsqmidaemon -> QMI_DAEMON_STATUS=1 -> imsdatadaemon ->
+# DATA_DAEMON_STATUS=1 -> ims_rtp_daemon) ported from the nightly's vendor rc
+# files, which we deliberately do NOT ship: these are QMI clients and need the
+# force-ipcr preload, and they must not free-run outside the qmux path. All
+# disabled; the flip script starts imsqmidaemon + ims_rtp_daemon. The preload
+# self-gates on persist.vendor.qmux.enable, same as gnss/qcrild.
+service vendor.imsqmidaemon /vendor/bin/imsqmidaemon
+    class main
+    user radio
+    socket ims_qmid stream 0660 system radio
+    group radio vendor_qti_diag log
+    setenv LD_PRELOAD libqmi_force_ipcr.so
+    disabled
+
+service vendor.imsdatadaemon /vendor/bin/imsdatadaemon
+    class main
+    user radio
+    socket ims_datad stream 0660 system radio
+    group radio wifi inet vendor_qti_diag log
+    setenv LD_PRELOAD libqmi_force_ipcr.so
+    disabled
+
+service vendor.ims_rtp_daemon /vendor/bin/ims_rtp_daemon
+    class main
+    user system
+    group radio vendor_qti_diag inet log
+    setenv LD_PRELOAD libqmi_force_ipcr.so
+    disabled
+
+# netmgrd (mobile data): programs the kernel rmnet_ipa data path over
+# WDS/WDA/IPA QMI. A QMI client -> needs the force-ipcr preload; the nightly
+# netmgrd.rc is deliberately NOT shipped (it would free-run netmgrd without
+# the preload). Runs as root like the stock service definition. Started from
+# qmux-flip-on.sh after qcrild, before the ims daemons (imsdatadaemon sits on
+# dsi_netctrl -> netmgrd).
+service qmux_netmgrd /vendor/bin/netmgrd
+    class main
+    user root
+    setenv LD_PRELOAD libqmi_force_ipcr.so
+    disabled
+
+# netmgrd runtime dirs (stock netmgrd.rc equivalents; harmless when qmux off)
+on boot
+    mkdir /dev/socket/netmgr 0750 radio radio
+    write /proc/sys/net/core/rmem_max 16777216
+    write /proc/sys/net/core/wmem_max 8388608
+
+on post-fs-data
+    mkdir /data/vendor/netmgr 0770 radio radio
+    mkdir /data/vendor/netmgr/recovery 0700 radio radio
+    write /data/vendor/netmgr/recovery/recovery_info ""
+    chown radio radio /data/vendor/netmgr/recovery/recovery_info
+
+on property:vendor.ims.QMI_DAEMON_STATUS=1
+    start vendor.imsdatadaemon
+
+on property:vendor.ims.DATA_DAEMON_STATUS=1
+    restart vendor.ims_rtp_daemon
+
 on property:persist.vendor.qmux.enable=1 && property:init.svc.vendor.rmt_storage=running
     exec_background u:r:su:s0 root -- /vendor/bin/qmux-flip-on.sh
