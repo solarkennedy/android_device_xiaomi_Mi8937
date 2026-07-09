@@ -23,6 +23,7 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/system_properties.h>
@@ -30,6 +31,17 @@
 #ifndef AF_QIPCRTR
 #define AF_QIPCRTR 42
 #endif
+
+// Children of a preloaded daemon must NOT inherit LD_PRELOAD: this .so lives
+// in /vendor, so any /system helper the daemon execs (netmgrd forks
+// ip-wrapper/netutils-wrapper for every address/route/iptables op) dies with
+// CANNOT LINK EXECUTABLE -> exit 1 -> netmgrd aborts the data call
+// (WDS_CONNECTED then NET_NO_NET). We are already mapped by the time
+// constructors run, so scrubbing the env only affects exec'd children.
+__attribute__((constructor)) static void qmux_scrub_ld_preload(void)
+{
+	unsetenv("LD_PRELOAD");
+}
 
 int socket(int domain, int type, int protocol)
 {
