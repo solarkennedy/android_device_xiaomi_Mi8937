@@ -21,6 +21,11 @@ allow rild self:socket create_socket_perms;
 # enable prop in-process to decide whether to force the ipc_router backend.
 get_prop(rild, vendor_qmux_prop)
 
+# netmgrd (qmux_netmgrd) is a QMI client on the ipc_router (generic socket)
+# via the same force-ipcr preload; same pair of rules as rild above.
+allow netmgrd self:socket create_socket_perms;
+get_prop(netmgrd, vendor_qmux_prop)
+
 # NOTE: the flip (qmux-flip-on.sh) still runs in the permissive su domain via
 # init.qmux.rc exec_background. For enforcing, move that logic to a dedicated
 # domain (or into init) and add the setter for vendor_qmux_prop.

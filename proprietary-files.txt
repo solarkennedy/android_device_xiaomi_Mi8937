@@ -306,6 +306,20 @@ vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config
 # libavservices_minijail — built from source in frameworks/av/media/module/minijail
 # libril — built from source in hardware/ril/libril
 
+# Mobile data (netmgrd) - from nightly. Programs the rmnet_ipa data path on
+# WDS/WDA QMI; started ONLY as the qmux_netmgrd init service (force-ipcr
+# preload) from qmux-flip-on.sh — we deliberately do NOT ship the nightly
+# netmgrd.rc. librmnetctl is built from source
+# (vendor/qcom/opensource/dataservices). dsi_config.xml is the dsi_netctrl
+# config (imsdatadaemon/qti clients).
+-vendor/bin/netmgrd;DISABLE_DEPS
+-vendor/lib64/libnetmgr_common.so;DISABLE_DEPS
+-vendor/lib64/libnetmgr_nr_fusion.so;DISABLE_DEPS
+-vendor/lib64/libnetmgr_rmnet_ext.so;DISABLE_DEPS
+-vendor/lib64/libnlnetmgr.so;DISABLE_DEPS
+vendor/etc/data/netmgr_config.xml
+vendor/etc/data/dsi_config.xml
+
 # GPS stack - from nightly
 # loc_launcher spawns the GNSS pipeline; xtra-daemon fetches almanac
 # data for assisted GPS.

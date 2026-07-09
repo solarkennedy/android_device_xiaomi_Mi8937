@@ -37,6 +37,23 @@ echo "modem QMI svcs: $(grep -c '0x00000000 |' /sys/kernel/debug/msm_ipc_router/
 start qmux_qcrild
 echo "qmux_qcrild started on ipc_router (SIM/registration via: getprop gsm.sim.state)"
 
+# 3b. Mobile data: netmgrd (force-ipcr via init.qmux.rc) programs the kernel
+# rmnet_ipa data path over WDS/WDA/IPA QMI and runs data calls end-to-end.
+# After qcrild (shares the modem QMI surface), before the IMS daemons
+# (imsdatadaemon's dsi_netctrl rides on netmgrd).
+start qmux_netmgrd
+echo "qmux_netmgrd started (data path via: ip addr show rmnet_ipa0)"
+
+# 4. IMS (VoLTE): imsqmidaemon kicks the stock prop chain (QMI_DAEMON_STATUS=1
+# -> imsdatadaemon -> DATA_DAEMON_STATUS=1 -> ims_rtp_daemon restart); all
+# three carry the force-ipcr preload via init.qmux.rc. ims_rtp_daemon is also
+# started explicitly so the imsrtpservice HAL is up even before the data
+# daemon reports in. Framework side is org.codeaurora.ims binding IImsRadio
+# on qmux_qcrild.
+start vendor.imsqmidaemon
+start vendor.ims_rtp_daemon
+echo "ims daemons started (IMS reg via: dumpsys telephony.registry | grep -i ims)"
+
 # GPS: the gnss HAL (mithorium-common gnss rc) unconditionally preloads
 # libqmi_force_ipcr.so; the shim only forces ipc_router when qmux is enabled, so
 # its loc_api_v02/libqmi_cci binds QMI_LOC (svc 16) on ipc_router. No action
