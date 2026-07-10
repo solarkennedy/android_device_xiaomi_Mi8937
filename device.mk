@@ -249,14 +249,16 @@ endif
 PRODUCT_COPY_FILES += \
     device/xiaomi/Mi8937/configs/sensors/hals.conf:$(TARGET_COPY_OUT_VENDOR)/etc/sensors/hals.conf
 
-# qmux legacy-IPC modem path (pepito bring-up) — stock A8 rmt_storage + its
-# private A8 vendor-lib closure (isolated under lib64/qmux, loaded via
-# LD_LIBRARY_PATH so they never shadow the A15 vendor libs), a flip script,
-# and a default-OFF init hook (persist.vendor.qmux.enable). See PLAN-qmux.md.
+# qmux legacy-IPC modem path (pepito) — stock A8 rmt_storage + its private A8
+# vendor-lib closure (isolated under lib64/qmux, loaded via LD_LIBRARY_PATH so
+# they never shadow the A15 vendor libs) and the static init selection
+# (init.qmux.rc, keyed on the libinit-set ro.vendor.qmux.enable; on for
+# pepito, off elsewhere). No flip script: the kernel xprt auto-enables on
+# pepito, so boot lands in the qmux world directly. See PLAN-qmux.md /
+# PLAN-qmux-bridge.md.
 ifeq ($(PRODUCT_HARDWARE),Mi8937)
 PRODUCT_COPY_FILES += \
     device/xiaomi/Mi8937/qmux/bin/qmux_rmt_storage:$(TARGET_COPY_OUT_VENDOR)/bin/qmux_rmt_storage \
-    device/xiaomi/Mi8937/qmux/bin/qmux-flip-on.sh:$(TARGET_COPY_OUT_VENDOR)/bin/qmux-flip-on.sh \
     device/xiaomi/Mi8937/qmux/init.qmux.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/init.qmux.rc \
     device/xiaomi/Mi8937/qmux/lib64/libCheckTunning.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libCheckTunning.so \
     device/xiaomi/Mi8937/qmux/lib64/libJrdQmi.so:$(TARGET_COPY_OUT_VENDOR)/lib64/qmux/libJrdQmi.so \

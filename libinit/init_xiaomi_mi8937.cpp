@@ -89,6 +89,14 @@ static void determine_device()
 {
     std::string codename;
 
+    // qmux: pepito's A8 modem lives on the legacy ipc_router, and the kernel
+    // (ipc_router_rpmsg_xprt auto-enable) puts the modem edge there at cold
+    // boot. This prop is the userspace half of the same switch: init.qmux.rc
+    // keys the rmt_storage/qcrild/netmgrd/IMS service selection off it, and
+    // the libqmi_force_ipcr preload consults it in every QMI client that
+    // carries it. Default off; flipped on for pepito below.
+    property_override("ro.vendor.qmux.enable", "0");
+
     android::base::ReadFileToString("/sys/xiaomi-msm8937-mach/codename", &codename, true);
     if (codename.empty())
         return;
@@ -110,6 +118,7 @@ static void determine_device()
         set_variant_props(prada_info);
     } else if (codename == "pepito") {
         set_variant_props(pepito_info);
+        property_override("ro.vendor.qmux.enable", "1");
     } else if (codename == "ugg") {
         set_variant_props(ugg_info);
     }
