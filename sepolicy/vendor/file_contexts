@@ -22,3 +22,9 @@
 # qmux (pepito ipc_router modem transport) — stock A8 rmt_storage runs in the
 # rmt_storage domain; qcrild uses the existing rild domain (rild_exec label).
 /(vendor|system/vendor)/bin/qmux_rmt_storage	u:object_r:rmt_storage_exec:s0
+
+# Palm EFS backing partition 'tunning' (mmcblk0p18), served by the A8
+# rmt_storage as a modem EFS client. p13/p14/p16 already get this label from
+# qcom sepolicy-legacy-um; 'tunning' is a Palm-only by-name entry (harmless on
+# siblings, where the path never exists).
+/dev/block/platform/soc/7824900\.sdhci/by-name/tunning	u:object_r:modem_efs_partition_device:s0

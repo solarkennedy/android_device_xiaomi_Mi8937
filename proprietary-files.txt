@@ -250,7 +250,10 @@ vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config
 # ATFWD-daemon = AT command forwarder for modem ↔ apps
 # ssr_diag / ssr_setup = subsystem-restart diagnostics
 -vendor/bin/rmt_storage;DISABLE_DEPS
--vendor/etc/init/vendor.qti.rmt_storage.rc
+# vendor.qti.rmt_storage.rc deliberately NOT shipped: it free-runs the nightly
+# (QRTR) rmt_storage on every variant. The service is defined `disabled` in
+# device qmux/init.qmux.rc and started only where ro.vendor.qmux.enable=0
+# (i.e. everywhere but pepito, which runs the stock A8 qmux_rmt_storage).
 -vendor/bin/time_daemon;DISABLE_DEPS
 -vendor/bin/ATFWD-daemon;DISABLE_DEPS
 -vendor/bin/ssr_diag;DISABLE_DEPS
@@ -308,8 +311,8 @@ vendor/etc/data/netmgr_config.xml:vendor/etc/overlayfs/common/data/netmgr_config
 
 # Mobile data (netmgrd) - from nightly. Programs the rmnet_ipa data path on
 # WDS/WDA QMI; started ONLY as the qmux_netmgrd init service (force-ipcr
-# preload) from qmux-flip-on.sh — we deliberately do NOT ship the nightly
-# netmgrd.rc. librmnetctl is built from source
+# preload) via init.qmux.rc where ro.vendor.qmux.enable=1 — we deliberately do
+# NOT ship the nightly netmgrd.rc. librmnetctl is built from source
 # (vendor/qcom/opensource/dataservices). dsi_config.xml is the dsi_netctrl
 # config (imsdatadaemon/qti clients).
 -vendor/bin/netmgrd;DISABLE_DEPS

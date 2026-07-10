@@ -1,24 +1,46 @@
-# init.qmux.rc — qmux legacy-IPC modem path (pepito bring-up).
+# init.qmux.rc — qmux legacy-IPC modem path (pepito).
 #
-# DEFAULT-OFF: nothing here changes boot unless persist.vendor.qmux.enable=1.
-# When set, on boot the flip script (below) starts the two qmux daemons and
-# flips the modem edge to ipc_router. The daemons are defined here as proper
-# init SERVICES (not backgrounded from the script) — a script that backgrounds
-# them is run via exec_background, whose process group init SIGKILLs on script
-# exit, killing the daemons with it.
+# Selection is STATIC, keyed on ro.vendor.qmux.enable (set per-variant by
+# libinit: 1 on pepito, 0 on every other variant). The kernel half
+# (ipc_router_rpmsg_xprt auto-enable) puts the modem edge on the legacy
+# ipc_router from the first IPCRTR probe at cold boot, so there is no runtime
+# flip, no mid-boot modem SSR, and no flip script: the services below simply
+# start into the correct world. Bench A/B of the transport remains possible
+# via the module param + persist.vendor.qmux.enable (see qmi_force_ipcr.c);
+# diag-tools/qmux-flip-on.sh keeps the old runtime-flip recipe.
+#
+# The QMI-client daemons (qcrild/netmgrd/IMS) carry the libqmi_force_ipcr
+# LD_PRELOAD, which fails libqmi_cci's AF_QIPCRTR probe so it uses its native
+# ipc_router backend; the shim self-gates on the qmux props, so it is a no-op
+# anywhere qmux is off. They start at `on boot` like their stock class-main
+# equivalents; QCCI blocks until the modem's QMI services appear, so starting
+# before the modem finishes PIL boot is the normal, stock-shaped sequence.
+
+# Nightly (QRTR) rmt_storage for the non-qmux variants. The vendor blob rc
+# (vendor.qti.rmt_storage.rc) is deliberately not shipped — it would free-run
+# this on pepito too; definition mirrors it verbatim, plus `disabled`.
+service vendor.rmt_storage /vendor/bin/rmt_storage
+    class core
+    user root
+    shutdown critical
+    ioprio rt 0
+    disabled
 
 # Stock A8 rmt_storage on the legacy IPC Router (serves the modem's RFSA
-# buffer + EFS). Its private A8 lib closure is isolated under /vendor/lib64/qmux.
+# buffer + EFS). Its private A8 lib closure is isolated under
+# /vendor/lib64/qmux. shutdown critical + ioprio mirror the stock service:
+# it must keep serving modem EFS through shutdown.
 service qmux_rmt_storage /vendor/bin/qmux_rmt_storage
     class core
     user root
+    shutdown critical
+    ioprio rt 0
     setenv LD_LIBRARY_PATH /vendor/lib64/qmux
     disabled
 
 # qcrild forced onto its native ipc_router QMI backend via the force-ipcr
-# preload (libqmi_cci probes AF_QIPCRTR; the shim fails it -> ipcr). Defined
-# here (not via the vendor qcrild.rc blob, which reverts on extract) so the
-# LD_PRELOAD ships reliably. Mirrors vendor.qcrild's creds.
+# preload. Defined here (not via the vendor qcrild.rc blob, which reverts on
+# extract) so the LD_PRELOAD ships reliably. Mirrors vendor.qcrild's creds.
 service qmux_qcrild /vendor/bin/hw/qcrild
     class main
     user radio
@@ -31,9 +53,7 @@ service qmux_qcrild /vendor/bin/hw/qcrild
 # chain imsqmidaemon -> QMI_DAEMON_STATUS=1 -> imsdatadaemon ->
 # DATA_DAEMON_STATUS=1 -> ims_rtp_daemon) ported from the nightly's vendor rc
 # files, which we deliberately do NOT ship: these are QMI clients and need the
-# force-ipcr preload, and they must not free-run outside the qmux path. All
-# disabled; the flip script starts imsqmidaemon + ims_rtp_daemon. The preload
-# self-gates on persist.vendor.qmux.enable, same as gnss/qcrild.
+# force-ipcr preload, and they must not free-run outside the qmux path.
 service vendor.imsqmidaemon /vendor/bin/imsqmidaemon
     class main
     user radio
@@ -60,32 +80,45 @@ service vendor.ims_rtp_daemon /vendor/bin/ims_rtp_daemon
 # netmgrd (mobile data): programs the kernel rmnet_ipa data path over
 # WDS/WDA/IPA QMI. A QMI client -> needs the force-ipcr preload; the nightly
 # netmgrd.rc is deliberately NOT shipped (it would free-run netmgrd without
-# the preload). Runs as root like the stock service definition. Started from
-# qmux-flip-on.sh after qcrild, before the ims daemons (imsdatadaemon sits on
-# dsi_netctrl -> netmgrd).
+# the preload). Runs as root like the stock service definition.
 service qmux_netmgrd /vendor/bin/netmgrd
     class main
     user root
     setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled
 
-# netmgrd runtime dirs (stock netmgrd.rc equivalents; harmless when qmux off)
-on boot
-    mkdir /dev/socket/netmgr 0750 radio radio
-    write /proc/sys/net/core/rmem_max 16777216
-    write /proc/sys/net/core/wmem_max 8388608
-
-on post-fs-data
+on post-fs-data && property:ro.vendor.qmux.enable=1
+    # netmgrd runtime dirs (stock netmgrd.rc equivalents)
     mkdir /data/vendor/netmgr 0770 radio radio
     mkdir /data/vendor/netmgr/recovery 0700 radio radio
     write /data/vendor/netmgr/recovery/recovery_info ""
     chown radio radio /data/vendor/netmgr/recovery/recovery_info
+
+# The qmux world. Modem PIL boot happens much later than `boot`, so
+# qmux_rmt_storage (class core creds, started here) is always up first, and
+# the QMI clients wait on service discovery like their stock counterparts.
+on boot && property:ro.vendor.qmux.enable=1
+    # netmgrd runtime env (stock netmgrd.rc equivalents)
+    mkdir /dev/socket/netmgr 0750 radio radio
+    write /proc/sys/net/core/rmem_max 16777216
+    write /proc/sys/net/core/wmem_max 8388608
+    start qmux_rmt_storage
+    start qmux_qcrild
+    start qmux_netmgrd
+    # imsqmidaemon kicks the stock IMS prop chain; ims_rtp_daemon is also
+    # started directly so the imsrtpservice HAL is up before the data daemon
+    # reports in. Framework side is org.codeaurora.ims binding IImsRadio on
+    # qmux_qcrild. GPS needs no start here: the gnss HAL (lazy-started by the
+    # location framework) carries the same self-gating preload.
+    start vendor.imsqmidaemon
+    start vendor.ims_rtp_daemon
+
+# The nightly (QRTR) world for every other variant.
+on boot && property:ro.vendor.qmux.enable=0
+    start vendor.rmt_storage
 
 on property:vendor.ims.QMI_DAEMON_STATUS=1
     start vendor.imsdatadaemon
 
 on property:vendor.ims.DATA_DAEMON_STATUS=1
     restart vendor.ims_rtp_daemon
-
-on property:persist.vendor.qmux.enable=1 && property:init.svc.vendor.rmt_storage=running
-    exec_background u:r:su:s0 root -- /vendor/bin/qmux-flip-on.sh

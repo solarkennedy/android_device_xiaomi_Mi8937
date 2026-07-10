@@ -26,6 +26,14 @@ get_prop(rild, vendor_qmux_prop)
 allow netmgrd self:socket create_socket_perms;
 get_prop(netmgrd, vendor_qmux_prop)
 
-# NOTE: the flip (qmux-flip-on.sh) still runs in the permissive su domain via
-# init.qmux.rc exec_background. For enforcing, move that logic to a dedicated
-# domain (or into init) and add the setter for vendor_qmux_prop.
+# The IMS daemons (imsqmidaemon/imsdatadaemon in the ims domain,
+# ims_rtp_daemon in hal_imsrtp) carry the same preload and the same
+# ipc_router (generic socket) QMI path.
+allow ims self:socket create_socket_perms;
+get_prop(ims, vendor_qmux_prop)
+allow hal_imsrtp self:socket create_socket_perms;
+get_prop(hal_imsrtp, vendor_qmux_prop)
+
+# No flip-script/su policy needed: qmux selection is static (kernel xprt
+# auto-enable on xiaomi,pepito + init.qmux.rc triggers keyed on the
+# libinit-set ro.vendor.qmux.enable, same vendor_qmux_prop context).
