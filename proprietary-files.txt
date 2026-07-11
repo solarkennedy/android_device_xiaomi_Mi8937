@@ -40,8 +40,14 @@ vendor/etc/sensors/sensor_def_qcomdev.conf
 -vendor/lib64/libbackuptunning.so;DISABLE_DEPS
 
 # Media/display C2D blitter - from Mi8937 nightly
+# libc2d30_bltlib is dlopen()ed by libC2D2, so it has no DT_NEEDED edge and the
+# blob closure walk misses it. It is the backend actually used on Adreno 505
+# (verified against stock: only bltlib maps, never libc2d30-a{3,4,5}xx). Without
+# it, C2D color conversion fails and the AVC hw encoder dies on first input buffer.
 -vendor/lib/libC2D2.so;DISABLE_DEPS|64e2a5a20312e5cb59c23b3a3a99bf8912946ed3
 -vendor/lib64/libC2D2.so;DISABLE_DEPS|6fb775e393ce7161b30e3a71fa0f320e86374425
+-vendor/lib/libc2d30_bltlib.so;DISABLE_DEPS|f3667f469dab7b3d5023785c6139819b557b3ed0
+-vendor/lib64/libc2d30_bltlib.so;DISABLE_DEPS|8c8fef67e346be907e1f9b312d11a1e9606ad6f0
 
 # Firmware (GPU) - from PAN
 vendor/firmware/a506_zap.b00
