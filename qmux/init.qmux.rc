@@ -85,6 +85,18 @@ service vendor.ims_rtp_daemon /vendor/bin/ims_rtp_daemon
     group radio vendor_qti_diag inet log
     disabled
 
+# VoLTE self-heal oneshot: asserts modem NV ims_test_mode=0 + qipcall bools
+# over v01 IMSS QMI (the A15 qcril ims module is v02-only and cannot). NV
+# persists in modem EFS, so the steady-state run is read-only (status prop
+# vendor.qmux.ims_enabler = ok); a fresh/refurb/EFS-wiped unit gets the
+# writes re-applied (= applied). Retries internally until the modem is up.
+service qmux_ims_enabler /vendor/bin/ims_enabler
+    class main
+    user radio
+    group radio log
+    oneshot
+    disabled
+
 # netmgrd (mobile data): programs the kernel rmnet_ipa data path over
 # WDS/WDA/IPA QMI. A QMI client -> carries the force-ipcr shim (DT_NEEDED);
 # the nightly netmgrd.rc is deliberately NOT shipped (it would free-run
@@ -119,6 +131,9 @@ on boot && property:ro.vendor.qmux.enable=1
     # location framework) links the same self-gating shim.
     start vendor.imsqmidaemon
     start vendor.ims_rtp_daemon
+    # VoLTE NV self-heal (oneshot; QCCI waits for the modem internally, and
+    # ordering vs the IMS daemons is irrelevant — it only touches modem NV).
+    start qmux_ims_enabler
 
 # The nightly (QRTR) world for every other variant.
 on boot && property:ro.vendor.qmux.enable=0

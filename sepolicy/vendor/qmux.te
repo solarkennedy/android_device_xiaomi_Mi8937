@@ -34,6 +34,24 @@ get_prop(ims, vendor_qmux_prop)
 allow hal_imsrtp self:socket create_socket_perms;
 get_prop(hal_imsrtp, vendor_qmux_prop)
 
+# ims_enabler — VoLTE NV self-heal boot oneshot (init.qmux.rc, PLAN-volte.md).
+# A QMI client on the ipc_router (generic socket) like the daemons above;
+# reads the qmux gate props (its own check + the force-ipcr preload) and
+# reports its outcome in vendor.qmux.ims_enabler. Vendor-lib loading (dlopen
+# of libqmi_cci/libqmiservices) is covered by the global non-coredomain
+# vendor_file_type rules in system/sepolicy.
+type ims_enabler, domain;
+type ims_enabler_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(ims_enabler)
+
+allow ims_enabler self:socket create_socket_perms;
+# Plain `socket ioctl` trips the global neverallowxperm allowlist requirement
+# (domain.te); scope it to the IPC-router service-discovery ioctls QCCI's ipcr
+# backend uses, same macro the legacy-um policy grants rild & friends.
+allowxperm ims_enabler self:socket ioctl msm_sock_ipc_ioctls;
+get_prop(ims_enabler, vendor_qmux_prop)
+set_prop(ims_enabler, vendor_qmux_prop)
+
 # No flip-script/su policy needed: qmux selection is static (kernel xprt
 # auto-enable on xiaomi,pepito + init.qmux.rc triggers keyed on the
 # libinit-set ro.vendor.qmux.enable, same vendor_qmux_prop context).
