@@ -24,6 +24,10 @@ TARGET_COPY_OUT_SYSTEM_EXT := system/system_ext
 TARGET_COPY_OUT_PRODUCT := system/product
 TARGET_COPY_OUT_ODM := vendor/odm
 
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+TARGET_USES_DEVICE_SPECIFIC_KEYMASTER := true
+endif
+
 # Inherit from common mithorium-common
 include device/xiaomi/mithorium-common/BoardConfigCommon.mk
 
@@ -51,6 +55,18 @@ TARGET_BOARD_FASTBOOT_INFO_FILE := $(DEVICE_PATH)/fastboot-info.txt
 
 # HIDL
 DEVICE_MANIFEST_FILE += $(DEVICE_PATH)/manifest.xml
+
+
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+# SELinux is Enforcing (bring-up-era androidboot.selinux=permissive removed
+# 2026-07-10 after the denial-fix batches + a clean live-enforcing smoke test;
+# see PLAN-release.md Phase 5). Escape hatch: re-add the cmdline arg, or
+# `setenforce 0` from the root shell post-boot.
+
+# We use pepito's stock QTI keymaster service/impl instead of the common
+# AOSP passthrough service, but the framework still needs the same HAL entry.
+DEVICE_MANIFEST_FILE += device/xiaomi/mithorium-common/configs/manifest/keymaster.xml
+endif
 
 # Kernel
 # Use base defconfig from BoardConfigCommon.mk (msm8937_defconfig)
