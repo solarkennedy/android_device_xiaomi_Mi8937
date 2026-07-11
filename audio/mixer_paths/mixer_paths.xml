@@ -154,6 +154,21 @@
     <ctl name="VoiceMMode2_Tx Mixer AFE_PCM_TX_MMode2" value="0" />
     <!-- Multimode Voice2 end -->
 
+    <!-- pepito: voice RX rides QUAT_MI2S (TFA9896 smart-amp drives both speaker
+         and the earpiece via its Rec GPIO switch; internal codec RX is unused).
+         Mirrors stock Palm mixer_paths_mtp.xml. -->
+    <ctl name="QUAT_MI2S_RX_Voice Mixer CSVoice" value="0" />
+    <ctl name="QUAT_MI2S_RX_Voice Mixer Voice2" value="0" />
+    <ctl name="QUAT_MI2S_RX_Voice Mixer VoWLAN" value="0" />
+    <ctl name="QUAT_MI2S_RX_Voice Mixer VoiceMMode1" value="0" />
+    <ctl name="QUAT_MI2S_RX_Voice Mixer VoiceMMode2" value="0" />
+    <ctl name="QUAT_MI2S_RX_Voice Mixer VoLTE" value="0" />
+    <ctl name="QUAT_MI2S_RX_Voice Mixer Voip" value="0" />
+    <ctl name="QUAT_MI2S_RX_Voice Mixer QCHAT" value="0" />
+    <ctl name="VOC_EXT_EC MUX" value="NONE" />
+    <ctl name="TFA9896 Profile" value="Bypass" />
+    <ctl name="TFA9896 Rec GPIO" value="Off" />
+
     <!-- Voip -->
     <ctl name="PRI_MI2S_RX_Voice Mixer Voip" value="0" />
     <ctl name="Voip_Tx Mixer TERT_MI2S_TX_Voip" value="0" />
@@ -477,7 +492,7 @@
     </path>
 
     <path name="voice-call">
-        <ctl name="PRI_MI2S_RX_Voice Mixer CSVoice" value="1" />
+        <ctl name="QUAT_MI2S_RX_Voice Mixer CSVoice" value="1" />
         <ctl name="Voice_Tx Mixer TERT_MI2S_TX_Voice" value="1" />
     </path>
 
@@ -501,7 +516,7 @@
     </path>
 
     <path name="voice2-call">
-        <ctl name="PRI_MI2S_RX_Voice Mixer Voice2" value="1" />
+        <ctl name="QUAT_MI2S_RX_Voice Mixer Voice2" value="1" />
         <ctl name="Voice2_Tx Mixer TERT_MI2S_TX_Voice2" value="1" />
     </path>
 
@@ -531,7 +546,7 @@
     </path>
 
     <path name="vowlan-call">
-        <ctl name="PRI_MI2S_RX_Voice Mixer VoWLAN" value="1" />
+        <ctl name="QUAT_MI2S_RX_Voice Mixer VoWLAN" value="1" />
         <ctl name="VoWLAN_Tx Mixer TERT_MI2S_TX_VoWLAN" value="1" />
     </path>
 
@@ -556,8 +571,16 @@
     </path>
 
     <path name="voicemmode1-call">
-        <ctl name="PRI_MI2S_RX_Voice Mixer VoiceMMode1" value="1" />
+        <ctl name="QUAT_MI2S_RX_Voice Mixer VoiceMMode1" value="1" />
         <ctl name="VoiceMMode1_Tx Mixer TERT_MI2S_TX_MMode1" value="1" />
+    </path>
+
+    <!-- stock echo-reference for speakerphone calls: EC ref taken from the
+         TFA9896's I2S feedback on QUAT_MI2S_TX -->
+    <path name="voicemmode1-call speaker">
+        <ctl name="QUAT_MI2S_RX_Voice Mixer VoiceMMode1" value="1" />
+        <ctl name="VoiceMMode1_Tx Mixer TERT_MI2S_TX_MMode1" value="1" />
+        <ctl name="VOC_EXT_EC MUX" value="QUAT_MI2S_TX" />
     </path>
 
     <path name="voicemmode1-call bt-sco">
@@ -580,8 +603,14 @@
     </path>
 
     <path name="voicemmode2-call">
-        <ctl name="PRI_MI2S_RX_Voice Mixer VoiceMMode2" value="1" />
+        <ctl name="QUAT_MI2S_RX_Voice Mixer VoiceMMode2" value="1" />
         <ctl name="VoiceMMode2_Tx Mixer TERT_MI2S_TX_MMode2" value="1" />
+    </path>
+
+    <path name="voicemmode2-call speaker">
+        <ctl name="QUAT_MI2S_RX_Voice Mixer VoiceMMode2" value="1" />
+        <ctl name="VoiceMMode2_Tx Mixer TERT_MI2S_TX_MMode2" value="1" />
+        <ctl name="VOC_EXT_EC MUX" value="QUAT_MI2S_TX" />
     </path>
 
     <path name="voicemmode2-call bt-sco">
@@ -763,7 +792,7 @@
         <path name="incall_music_uplink2" />
     </path>
     <path name="volte-call">
-        <ctl name="PRI_MI2S_RX_Voice Mixer VoLTE" value="1" />
+        <ctl name="QUAT_MI2S_RX_Voice Mixer VoLTE" value="1" />
         <ctl name="VoLTE_Tx Mixer TERT_MI2S_TX_VoLTE" value="1" />
    </path>
 
@@ -792,7 +821,7 @@
     </path>
 
     <path name="compress-voip-call">
-        <ctl name="PRI_MI2S_RX_Voice Mixer Voip" value="1" />
+        <ctl name="QUAT_MI2S_RX_Voice Mixer Voip" value="1" />
         <ctl name="Voip_Tx Mixer TERT_MI2S_TX_Voip" value="1" />
     </path>
 
@@ -818,7 +847,7 @@
     </path>
 
     <path name="qchat-call">
-        <ctl name="PRI_MI2S_RX_Voice Mixer QCHAT" value="1" />
+        <ctl name="QUAT_MI2S_RX_Voice Mixer QCHAT" value="1" />
         <ctl name="QCHAT_Tx Mixer TERT_MI2S_TX_QCHAT" value="1" />
     </path>
 
@@ -887,11 +916,10 @@
    </path>
 
     <path name="handset">
-        <ctl name="RX1 MIX1 INP1" value="RX1" />
-        <ctl name="RDAC2 MUX" value="RX1" />
-        <ctl name="RX1 Digital Volume" value="84" />
-        <ctl name="EAR PA Gain" value="POS_6_DB" />
-        <ctl name="EAR_S" value="Switch" />
+        <!-- pepito earpiece: the receiver is wired behind the TFA9896's
+             Rec switch (rec-gpio), NOT the internal codec EAR PA (stock) -->
+        <ctl name="TFA9896 Profile" value="Handset" />
+        <ctl name="TFA9896 Rec GPIO" value="On" />
     </path>
 
     <path name="handset-mic">
@@ -941,7 +969,9 @@
     </path>
 
     <path name="voice-speaker">
-        <path name="speaker" />
+        <!-- stock uses the dedicated Speech tuning profile for speakerphone -->
+        <ctl name="TFA9896 Profile" value="Speech" />
+        <ctl name="TFA9896 Rec GPIO" value="Off" />
     </path>
 
     <path name="wsa-voice-speaker">
