@@ -29,6 +29,15 @@ blob_fixups: blob_fixups_user_type = {
             rb'ro\.build\.version\.security_patch\x00',
             b'ro.keymaster.xxx.security_patch\x00',
         ),
+    # [qmux] The force-ipcr shim rides as DT_NEEDED, not LD_PRELOAD: init may
+    # never grant noatsecure (neverallow, b/140789528), so under Enforcing
+    # AT_SECURE=1 makes bionic silently scrub LD_PRELOAD. The shim self-gates
+    # on the qmux props (no-op for non-pepito variants).
+    'vendor/bin/hw/qcrild': blob_fixup().add_needed('libqmi_force_ipcr.so'),
+    'vendor/bin/netmgrd': blob_fixup().add_needed('libqmi_force_ipcr.so'),
+    'vendor/bin/imsqmidaemon': blob_fixup().add_needed('libqmi_force_ipcr.so'),
+    'vendor/bin/imsdatadaemon': blob_fixup().add_needed('libqmi_force_ipcr.so'),
+    'vendor/bin/ims_rtp_daemon': blob_fixup().add_needed('libqmi_force_ipcr.so'),
 }
 
 module = ExtractUtilsModule(
