@@ -4,3 +4,21 @@
 // cannot see modules defined here). It rides as DT_NEEDED of its consumers,
 // never LD_PRELOAD (bionic scrubs LD_PRELOAD under Enforcing: neverallow
 // init *:process noatsecure, b/140789528). See PLAN-qmux-bridge.md.
+
+// ims_enabler — [qmux, VoLTE productization] boot oneshot that asserts the
+// modem NV settings IMS registration depends on (ims_test_mode=0 + qipcall
+// bools), so fresh flashes / EFS-wiped units self-heal. QMI blobs are
+// dlopen()ed at runtime (no import libs for the vendor prebuilts); the
+// ipc_router transport comes from linking libqmi_force_ipcr (in the global
+// group it interposes socket() for the dlopen()ed libs too). See
+// PLAN-volte.md.
+cc_binary {
+    name: "ims_enabler",
+    srcs: ["ims_enabler.c"],
+    vendor: true,
+    shared_libs: [
+        "libqmi_force_ipcr",
+        "liblog",
+    ],
+    cflags: ["-Wall", "-Werror"],
+}
