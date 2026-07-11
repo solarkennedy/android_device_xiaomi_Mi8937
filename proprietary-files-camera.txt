@@ -111,6 +111,83 @@
 -vendor/lib/libqmiservices.so:vendor/lib/overlayfs/pepito/libqmiservices.so;DISABLE_DEPS;MODULE=pepito_libqmiservices
 -vendor/lib/libsensor1.so:vendor/lib/overlayfs/pepito/libsensor1.so;DISABLE_DEPS;MODULE=pepito_libsensor1
 
+# libstdc++.so: stock 8.1 minimal C++ runtime stub (from system.bin, not vendor.bin); pinned. Needed by libTsProcess.so; system libstdc++ is not exposed to the vendor linker namespace, so it is bundled into the overlay instead.
+-lib/libstdc++.so:vendor/lib/overlayfs/pepito/libstdc++.so;DISABLE_DEPS;MODULE=pepito_libstdcpp
+# imgbase algo implementation libs (dlopen'd at runtime by wrapper libs above)
+-lib/liboptizoom.so:vendor/lib/overlayfs/pepito/liboptizoom.so;DISABLE_DEPS;MODULE=pepito_liboptizoom
+-lib/libremosaic_daemon.so:vendor/lib/overlayfs/pepito/libremosaic_daemon.so;DISABLE_DEPS;MODULE=pepito_libremosaic_daemon
+-lib/libseemore.so:vendor/lib/overlayfs/pepito/libseemore.so;DISABLE_DEPS;MODULE=pepito_libseemore
+-lib/libubifocus.so:vendor/lib/overlayfs/pepito/libubifocus.so;DISABLE_DEPS;MODULE=pepito_libubifocus
+
+
+# Camera tuning + JPEG + stock-HAL overlay (pepito) - from Palm PVG100 stock AML0.
+# Restored 2026-07-10: these shipped only via the legacy-generated vendor mk and
+# were silently dropped when the new extract-utils regen rebuilt the packaging
+# (they were never in the migrated lists). libmmjpeg/libmmqjpeg*/libqomx_jpegenc
+# are the four blobs that fixed JPEG capture (2026-07-03); libmmcamera_eeprom_util
+# is dlopen'd by the sensor eeprom loader; the chromatix set is dlopen'd by
+# mm-qcamera-daemon at capability time - without it module_sensor_init fails and
+# the HAL publishes 0x0 stream configs (camera fully dead).
+-vendor/lib/libchromatix_ov12a10_4K.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_4K_preview_dw9763.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_4K_video_dw9763.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_common.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_cpp_4K.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_cpp_hfr_120.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_cpp_hfr_60.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_cpp_hfr_90.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_cpp_liveshot.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_cpp_preview.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_cpp_snapshot.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_cpp_video.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_default_preview_dw9763.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_default_video.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_default_video_dw9763.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_hfr_120.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_hfr_120_dw9763.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_hfr_60.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_hfr_60_dw9763.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_hfr_90.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_hfr_90_dw9763.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_liveshot.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_postproc.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_preview.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_snapshot.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_zsl_preview_dw9763.so;DISABLE_DEPS
+-vendor/lib/libchromatix_ov12a10_zsl_video_dw9763.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_a3_default_preview.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_a3_default_video.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_a3_hfr_120.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_a3_hfr_60.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_a3_hfr_90.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_common.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_cpp_hfr_120.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_cpp_hfr_60.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_cpp_hfr_90.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_cpp_liveshot.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_cpp_preview.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_cpp_snapshot.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_cpp_video.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_default_video.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_hfr_120.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_hfr_60.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_hfr_90.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_liveshot.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_postproc.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_preview.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_snapshot.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_zsl_preview.so;DISABLE_DEPS
+-vendor/lib/libchromatix_s5k4h8_zsl_video.so;DISABLE_DEPS
+-vendor/lib/libmmcamera_eeprom_util.so;DISABLE_DEPS
+-vendor/lib/libmmcamera_tintless_algo.so;DISABLE_DEPS
+-vendor/lib/libmmcamera_tintless_bg_pca_algo.so;DISABLE_DEPS
+-vendor/lib/libmmjpeg.so;DISABLE_DEPS
+-vendor/lib/libmmqjpeg_codec.so;DISABLE_DEPS
+-vendor/lib/libmmqjpegdma.so;DISABLE_DEPS
+-vendor/lib/libqomx_jpegenc.so;DISABLE_DEPS
+-lib/hw/camera.msm8937.so:vendor/lib/overlayfs/pepito/hw/camera.msm8937.so;DISABLE_DEPS;MODULE=pepito_camera.msm8937
+-lib/libVDBeautyShotAPI.so:vendor/lib/overlayfs/pepito/libVDBeautyShotAPI.so;DISABLE_DEPS;MODULE=pepito_libVDBeautyShotAPI
+
 # Firmware (CPP camera) - from Palm PVG100 stock AML0
 firmware/cpp_firmware_v1_5_0.fw:vendor/firmware/cpp_firmware_v1_5_0.fw
 
