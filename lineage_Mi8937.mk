@@ -32,6 +32,33 @@ PRODUCT_PACKAGES += \
     xiaomi_pepito_overlay_lineagesettings
 endif
 
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+# Android-Go-style build-time-only tuning for this low-RAM (~2.87GB) device.
+# See PLAN-perf-battery.md "Category 1" - unlike the gotweaks Category 2
+# properties, none of these have a live runtime knob, so they're baked in
+# here rather than exposed as a Pepito Tweaks toggle.
+
+# Speed-profile (not the default filter) for system_server + wifi-service,
+# to reduce RAM and storage.
+PRODUCT_SYSTEM_SERVER_COMPILER_FILTER := speed-profile
+
+# Skip building the debug ART variant (libartd) - saves storage, no runtime
+# effect on a non-eng build that would never load it anyway.
+PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD := false
+
+# Strip the dex local variable table/type table to shrink the system image.
+# Only affects JDWP-level local-variable debugging, not stack traces.
+PRODUCT_MINIMIZE_JAVA_DEBUG_INFO := true
+
+# Link the low-memory native (jemalloc) allocator variant to reduce RSS, at
+# some allocation-speed cost. Matches upstream's own eng exclusion - this
+# device's build target is userdebug (PLAN.md), so this is always live, but
+# skip it if anyone ever builds this product as eng.
+ifeq (,$(filter eng,$(TARGET_BUILD_VARIANT)))
+MALLOC_LOW_MEMORY := true
+endif
+endif
+
 # Device identifier. This must come after all inclusions
 PRODUCT_DEVICE := Mi8937
 PRODUCT_NAME := lineage_Mi8937
