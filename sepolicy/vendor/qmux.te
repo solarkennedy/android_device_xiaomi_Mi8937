@@ -37,3 +37,17 @@ get_prop(hal_imsrtp, vendor_qmux_prop)
 # No flip-script/su policy needed: qmux selection is static (kernel xprt
 # auto-enable on xiaomi,pepito + init.qmux.rc triggers keyed on the
 # libinit-set ro.vendor.qmux.enable, same vendor_qmux_prop context).
+
+# THE AT_SECURE TRAP, SELINUX EDITION (found on the first Enforcing cold boot,
+# 2026-07-10): the qmux services originally shipped `setenv LD_PRELOAD
+# libqmi_force_ipcr.so`, but without `noatsecure` on the init→domain
+# transition the kernel sets AT_SECURE=1 and bionic silently scrubs
+# LD_PRELOAD (and LD_LIBRARY_PATH — qmux_rmt_storage's A8 closure).
+# The noatsecure check is dontaudited in core policy, so NO denial ever
+# appears, and granting it is impossible: `neverallow init *:process
+# noatsecure` (b/140789528). Symptom signature: LD_PRELOAD present in
+# /proc/<pid>/environ but absent from maps. RESOLUTION (no policy): the shim
+# rides as DT_NEEDED — patched into the nightly QMI blobs + pm-service via
+# extract-files.py blob_fixups, linked into the source-built gnss service and
+# ims_enabler — and qmux_rmt_storage + its closure carry DT_RUNPATH
+# /vendor/lib64/qmux instead of LD_LIBRARY_PATH.

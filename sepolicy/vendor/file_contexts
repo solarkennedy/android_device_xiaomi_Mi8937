@@ -25,8 +25,9 @@
 # self-demotion caps). Same reuse pattern as qmux_rmt_storage above.
 /(vendor|system/vendor)/bin/sensors\.qti	u:object_r:sensors_exec:s0
 
-# Palm EFS backing partition 'tunning' (mmcblk0p18), served by the A8
-# rmt_storage as a modem EFS client. p13/p14/p16 already get this label from
-# qcom sepolicy-legacy-um; 'tunning' is a Palm-only by-name entry (harmless on
-# siblings, where the path never exists).
+# Palm EFS backing partitions 'tunning' (mmcblk0p18) and 'simlock'
+# (mmcblk0p20), served by the A8 rmt_storage as modem EFS clients. p13/p14/p16
+# already get this label from qcom sepolicy-legacy-um; these are Palm-only
+# by-name entries (harmless on siblings, where the paths never exist).
 /dev/block/platform/soc/7824900\.sdhci/by-name/tunning	u:object_r:modem_efs_partition_device:s0
+/dev/block/platform/soc/7824900\.sdhci/by-name/simlock	u:object_r:modem_efs_partition_device:s0

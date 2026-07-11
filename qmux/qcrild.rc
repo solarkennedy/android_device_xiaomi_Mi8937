@@ -1,8 +1,9 @@
 # qcrild.rc — [qmux] device-tree override of the vendor blob (removed from
-# proprietary-files.txt). Only change vs stock: `setenv LD_PRELOAD
-# libqmi_force_ipcr.so` on each qcrild instance, which forces libqmi_cci onto
-# its native IPC-Router backend so qcrild reaches the pepito A8 modem (which
-# lives on ipc_router, not QRTR — see PLAN-qmux.md / PLAN-qmux-bridge.md).
+# proprietary-files.txt), matching stock. The force-ipcr shim is a patched-in
+# DT_NEEDED of the qcrild binary itself (extract-files.py blob_fixups), NOT an
+# LD_PRELOAD: init may not grant noatsecure, so under Enforcing bionic scrubs
+# LD_PRELOAD (see qmux/Android.bp). The shim self-gates on the qmux props
+# — see PLAN-qmux.md / PLAN-qmux-bridge.md.
 # Services stay `disabled`: on pepito telephony runs as qmux_qcrild
 # (init.qmux.rc, started on boot where ro.vendor.qmux.enable=1), and this
 # override exists so the vendor blob rc can never free-run vendor.qcrild.
@@ -12,7 +13,6 @@ service vendor.qcrild /vendor/bin/hw/qcrild
     user radio
     group radio cache inet misc audio log readproc wakelock oem_2901
     capabilities BLOCK_SUSPEND NET_ADMIN NET_RAW
-    setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled
 
 service vendor.qcrild2 /vendor/bin/hw/qcrild -c 2
@@ -20,7 +20,6 @@ service vendor.qcrild2 /vendor/bin/hw/qcrild -c 2
     user radio
     group radio cache inet misc audio log readproc wakelock oem_2901
     capabilities BLOCK_SUSPEND NET_ADMIN NET_RAW
-    setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled
 
 service vendor.qcrild3 /vendor/bin/hw/qcrild -c 3
@@ -28,5 +27,4 @@ service vendor.qcrild3 /vendor/bin/hw/qcrild -c 3
     user radio
     group radio cache inet misc audio log readproc wakelock oem_2901
     capabilities BLOCK_SUSPEND NET_ADMIN NET_RAW
-    setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled

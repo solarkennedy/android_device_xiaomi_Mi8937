@@ -9,12 +9,20 @@
 # via the module param + persist.vendor.qmux.enable (see qmi_force_ipcr.c);
 # diag-tools/qmux-flip-on.sh keeps the old runtime-flip recipe.
 #
-# The QMI-client daemons (qcrild/netmgrd/IMS) carry the libqmi_force_ipcr
-# LD_PRELOAD, which fails libqmi_cci's AF_QIPCRTR probe so it uses its native
-# ipc_router backend; the shim self-gates on the qmux props, so it is a no-op
-# anywhere qmux is off. They start at `on boot` like their stock class-main
-# equivalents; QCCI blocks until the modem's QMI services appear, so starting
-# before the modem finishes PIL boot is the normal, stock-shaped sequence.
+# The QMI-client daemons (qcrild/netmgrd/IMS) carry libqmi_force_ipcr as a
+# patched-in DT_NEEDED (extract-files.py blob_fixups) which fails libqmi_cci's
+# AF_QIPCRTR probe so it uses its native ipc_router backend; the shim
+# self-gates on the qmux props, so it is a no-op anywhere qmux is off. NOT an
+# LD_PRELOAD: init may never grant noatsecure (neverallow, b/140789528), so
+# under Enforcing AT_SECURE=1 makes bionic silently scrub LD_PRELOAD/
+# LD_LIBRARY_PATH — the first enforcing cold boot lost the shim in every
+# preload-carrying service (no SIM) and qmux_rmt_storage crash-looped on its
+# scrubbed LD_LIBRARY_PATH (its A8 closure is now found via patched-in
+# DT_RUNPATH /vendor/lib64/qmux on the binary and every closure lib).
+#
+# The daemons start at `on boot` like their stock class-main equivalents;
+# QCCI blocks until the modem's QMI services appear, so starting before the
+# modem finishes PIL boot is the normal, stock-shaped sequence.
 
 # Nightly (QRTR) rmt_storage for the non-qmux variants. The vendor blob rc
 # (vendor.qti.rmt_storage.rc) is deliberately not shipped — it would free-run
@@ -29,37 +37,39 @@ service vendor.rmt_storage /vendor/bin/rmt_storage
 # Stock A8 rmt_storage on the legacy IPC Router (serves the modem's RFSA
 # buffer + EFS). Its private A8 lib closure is isolated under
 # /vendor/lib64/qmux. shutdown critical + ioprio mirror the stock service:
-# it must keep serving modem EFS through shutdown.
+# it must keep serving modem EFS through shutdown. The supplemental groups
+# match what it actually opens — /sys/power/wake_lock (radio:wakelock 0660),
+# /dev/uio0 (system 0660), /dev/diag (system:vendor_qti_diag 0660) — so bare
+# root passes DAC without CAP_DAC_OVERRIDE (which sepolicy can never grant:
+# dac_override is neverallowed outside the core allowlist).
 service qmux_rmt_storage /vendor/bin/qmux_rmt_storage
     class core
     user root
+    group system wakelock vendor_qti_diag
     shutdown critical
     ioprio rt 0
-    setenv LD_LIBRARY_PATH /vendor/lib64/qmux
     disabled
 
-# qcrild forced onto its native ipc_router QMI backend via the force-ipcr
-# preload. Defined here (not via the vendor qcrild.rc blob, which reverts on
-# extract) so the LD_PRELOAD ships reliably. Mirrors vendor.qcrild's creds.
+# qcrild reaches its native ipc_router QMI backend via the force-ipcr shim
+# (DT_NEEDED in the binary). Defined here (not via the vendor qcrild.rc blob,
+# which reverts on extract). Mirrors vendor.qcrild's creds.
 service qmux_qcrild /vendor/bin/hw/qcrild
     class main
     user radio
     group radio cache inet misc audio log readproc wakelock oem_2901
     capabilities BLOCK_SUSPEND NET_ADMIN NET_RAW
-    setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled
 
 # IMS daemons (VoLTE) — stock QTI service definitions (names, sockets, prop
 # chain imsqmidaemon -> QMI_DAEMON_STATUS=1 -> imsdatadaemon ->
 # DATA_DAEMON_STATUS=1 -> ims_rtp_daemon) ported from the nightly's vendor rc
-# files, which we deliberately do NOT ship: these are QMI clients and need the
-# force-ipcr preload, and they must not free-run outside the qmux path.
+# files, which we deliberately do NOT ship so they can never free-run outside
+# the qmux path (they are QMI clients; the force-ipcr shim rides as DT_NEEDED).
 service vendor.imsqmidaemon /vendor/bin/imsqmidaemon
     class main
     user radio
     socket ims_qmid stream 0660 system radio
     group radio vendor_qti_diag log
-    setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled
 
 service vendor.imsdatadaemon /vendor/bin/imsdatadaemon
@@ -67,24 +77,21 @@ service vendor.imsdatadaemon /vendor/bin/imsdatadaemon
     user radio
     socket ims_datad stream 0660 system radio
     group radio wifi inet vendor_qti_diag log
-    setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled
 
 service vendor.ims_rtp_daemon /vendor/bin/ims_rtp_daemon
     class main
     user system
     group radio vendor_qti_diag inet log
-    setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled
 
 # netmgrd (mobile data): programs the kernel rmnet_ipa data path over
-# WDS/WDA/IPA QMI. A QMI client -> needs the force-ipcr preload; the nightly
-# netmgrd.rc is deliberately NOT shipped (it would free-run netmgrd without
-# the preload). Runs as root like the stock service definition.
+# WDS/WDA/IPA QMI. A QMI client -> carries the force-ipcr shim (DT_NEEDED);
+# the nightly netmgrd.rc is deliberately NOT shipped (it would free-run
+# netmgrd). Runs as root like the stock service definition.
 service qmux_netmgrd /vendor/bin/netmgrd
     class main
     user root
-    setenv LD_PRELOAD libqmi_force_ipcr.so
     disabled
 
 on post-fs-data && property:ro.vendor.qmux.enable=1
@@ -109,7 +116,7 @@ on boot && property:ro.vendor.qmux.enable=1
     # started directly so the imsrtpservice HAL is up before the data daemon
     # reports in. Framework side is org.codeaurora.ims binding IImsRadio on
     # qmux_qcrild. GPS needs no start here: the gnss HAL (lazy-started by the
-    # location framework) carries the same self-gating preload.
+    # location framework) links the same self-gating shim.
     start vendor.imsqmidaemon
     start vendor.ims_rtp_daemon
 

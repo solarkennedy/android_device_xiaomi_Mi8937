@@ -1,12 +1,6 @@
-// libqmi_force_ipcr — [qmux bridge, Architecture D]
-// LD_PRELOAD shim that forces QTI libqmi_cci onto its native IPC-Router
-// (AF_MSM_IPC) backend by failing the AF_QIPCRTR probe. Scoped per-service
-// via `setenv LD_PRELOAD` in qcrild.rc / the gnss HAL .rc — NEVER
-// system-wide (adsp/sensors keep real QRTR). See PLAN-qmux-bridge.md.
-cc_library_shared {
-    name: "libqmi_force_ipcr",
-    srcs: ["qmi_force_ipcr.c"],
-    vendor: true,
-    compile_multilib: "both",
-    cflags: ["-Wall", "-Werror"],
-}
+// libqmi_force_ipcr (the socket()-interposing force-ipcr shim) moved to
+// device/xiaomi/mithorium-common/libshim/ — the family-wide gnss service
+// links it and soong namespaces only import downward (mithorium-common
+// cannot see modules defined here). It rides as DT_NEEDED of its consumers,
+// never LD_PRELOAD (bionic scrubs LD_PRELOAD under Enforcing: neverallow
+// init *:process noatsecure, b/140789528). See PLAN-qmux-bridge.md.
