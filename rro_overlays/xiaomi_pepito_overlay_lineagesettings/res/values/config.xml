@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <!-- pepito has no physical volume keys: show the QS volume slider by default,
+         like the stock Palm PVG100 software did. -->
+    <bool name="def_qs_show_volume_slider">true</bool>
+</resources>
