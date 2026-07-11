@@ -28,7 +28,8 @@ PRODUCT_PACKAGES += \
 
 ifeq ($(TARGET_DEVICE_PEPITO),true)
 PRODUCT_PACKAGES += \
-    xiaomi_pepito_overlay_lineage
+    xiaomi_pepito_overlay_lineage \
+    xiaomi_pepito_overlay_lineagesettings
 endif
 
 # Device identifier. This must come after all inclusions
