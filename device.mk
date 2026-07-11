@@ -48,7 +48,11 @@ PRODUCT_PACKAGES += \
     xiaomi_wt8937_overlay_Settings
 
 ifeq ($(TARGET_DEVICE_PEPITO),true)
+# PepitoLauncher2: stock-Palm-launcher reimplementation, ships alongside
+# Trebuchet (not default). Source: packages/apps/PepitoLauncher2, a clone of
+# the canonical repo at ~/Projects/PepitoLauncher2 (PLAN-pepitolauncher2.md).
 PRODUCT_PACKAGES += \
+    PepitoLauncher2 \
     VolumeTile \
     xiaomi_pepito_overlay \
     xiaomi_pepito_overlay_systemui
