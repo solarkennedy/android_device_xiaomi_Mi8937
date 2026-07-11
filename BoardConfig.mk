@@ -99,6 +99,10 @@ endif
 # Properties
 TARGET_VENDOR_PROP += $(DEVICE_PATH)/vendor.prop
 
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+TARGET_VENDOR_PROP += $(DEVICE_PATH)/pepito.vendor.prop
+endif
+
 # Root extra folders
 BOARD_ROOT_EXTRA_FOLDERS := metadata
 
