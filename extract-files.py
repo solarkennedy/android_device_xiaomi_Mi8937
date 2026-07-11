@@ -8,6 +8,7 @@ from extract_utils.file import File
 from extract_utils.fixups_blob import (
     BlobFixupCtx,
     blob_fixup,
+    blob_fixups_user_type,
 )
 from extract_utils.main import (
     ExtractUtils,
@@ -18,11 +19,24 @@ namespace_imports = [
     'device/xiaomi/mithorium-common',
 ]
 
+blob_fixups: blob_fixups_user_type = {
+    'vendor/lib64/hw/android.hardware.keymaster@3.0-impl-qti.so': blob_fixup()
+        .binary_regex_replace(
+            rb'ro\.build\.version\.release\x00',
+            b'ro.keymaster.xxx.release\x00',
+        )
+        .binary_regex_replace(
+            rb'ro\.build\.version\.security_patch\x00',
+            b'ro.keymaster.xxx.security_patch\x00',
+        ),
+}
+
 module = ExtractUtilsModule(
     'Mi8937',
     'xiaomi',
     namespace_imports=namespace_imports,
     add_firmware_proprietary_file=True,
+    blob_fixups=blob_fixups,
 )
 
 # The new extract-utils only auto-registers proprietary-files.txt; the extra
