@@ -151,6 +151,26 @@ PRODUCT_SYSTEM_PROPERTIES += \
     audio.offload.disable=1
 endif
 
+# Face unlock — Phase 2: Paranoid Sense port (packages/apps/FaceUnlock, crDroid
+# 16.0). Real RGB recognition via Megvii engine (Moto blobs, arm64), app-level
+# (co.aospa.sense on system_ext) bridged into FaceService by the SenseProvider
+# frameworks/base patch, gated on ro.face.sense_service. Registers as a WEAK
+# face sensor; enrollment redirected to the app's EnrollActivity by
+# FaceUnlockOverlay's config_face_enroll. Phase 1 (AOSP virtual IFace HAL)
+# retired 2026-07-12 after validating the framework path end-to-end; the
+# feature XML below is still required to advertise FEATURE_FACE.
+# See PLAN-face-unlock.md.
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+PRODUCT_PACKAGES += \
+    FaceUnlock
+
+PRODUCT_COPY_FILES += \
+    frameworks/native/data/etc/android.hardware.biometrics.face.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.biometrics.face.xml
+
+PRODUCT_SYSTEM_PROPERTIES += \
+    ro.face.sense_service=true
+endif
+
 # Fingerprint
 ifeq ($(PRODUCT_HARDWARE),Mi8937)
 PRODUCT_COPY_FILES += \
