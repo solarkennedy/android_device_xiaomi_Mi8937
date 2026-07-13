@@ -24,4 +24,9 @@
 
     <!-- default to gestural navigation (0=3-button, 1=2-button, 2=gestural) -->
     <integer name="config_navBarInteractionMode">2</integer>
+
+    <!-- battery is a bigger deal on this phone than most; default to showing
+         the percentage inside the status bar battery icon, matching stock
+         Android's current look, rather than AOSP's default of hidden -->
+    <bool name="config_defaultBatteryPercentageSetting">true</bool>
 </resources>
