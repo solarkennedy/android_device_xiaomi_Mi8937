@@ -1,0 +1,8 @@
+// Dedicated signing key for PepitoLauncher2, kept out of both the app repo
+// and this tree (~/keys/pepitolauncher2/, symlinked in) so the app stays
+// update-compatible across ROM rebuilds instead of riding the shared AOSP
+// platform testkey.
+android_app_certificate {
+    name: "pepitolauncher2_certificate",
+    certificate: "pepitolauncher2",
+}
