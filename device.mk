@@ -149,6 +149,14 @@ PRODUCT_VENDOR_PROPERTIES += \
 # build (see PLAN-audio.md "External speaker amp (TFA9896)").
 PRODUCT_SYSTEM_PROPERTIES += \
     audio.offload.disable=1
+
+# OTA: point the Updater app (packages/apps/Updater) at our own static feed
+# instead of a real LineageOS OTA server. Builds are hosted as GitHub Release
+# assets on solarkennedy/lineageos-pepito; the JSON below is generated per
+# release by lineageos-pepito/scripts/gen-ota-json.py. No {device}/{type}/{incr}
+# placeholders needed since the file already covers only this device.
+PRODUCT_SYSTEM_PROPERTIES += \
+    lineage.updater.uri=https://raw.githubusercontent.com/solarkennedy/lineageos-pepito/lineageos23.2/pepito.json
 endif
 
 # Face unlock — Phase 2: Paranoid Sense port (packages/apps/FaceUnlock, crDroid
