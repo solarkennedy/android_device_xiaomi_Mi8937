@@ -29,4 +29,15 @@
          the percentage inside the status bar battery icon, matching stock
          Android's current look, rather than AOSP's default of hidden -->
     <bool name="config_defaultBatteryPercentageSetting">true</bool>
+
+    <!-- Cap max backlight at stock PVG100's max luminance. Stock's brightness
+         curve saturates at ~70-73% WLED duty (CT-3 wall measurement: stock max
+         display power ~630mW vs 863mW at this panel's true 100% duty), so an
+         uncapped max slider drives ~1.4x stock's light for +235mW. Both floats
+         must be set together: if either is unset the framework falls back to
+         the config_screenBrightnessSettingMinimum/Maximum ints
+         (DisplayDeviceConfig.loadBrightnessConstraintsFromConfigXml).
+         0.0 matches the existing int minimum of 1. -->
+    <item name="config_screenBrightnessSettingMinimumFloat" format="float" type="dimen">0.0</item>
+    <item name="config_screenBrightnessSettingMaximumFloat" format="float" type="dimen">0.73</item>
 </resources>
