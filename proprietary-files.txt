@@ -70,7 +70,10 @@ vendor/firmware/venus.mdt
 -vendor/lib64/hw/gatekeeper.msm8937.so;DISABLE_DEPS
 
 # IMS (uceService) - from olive (Pie)
--system/app/uceShimService/uceShimService.apk:system_ext/app/uceShimService/uceShimService.apk
+# uceShimService (RCS UCE presence) debloated 2026-07-13 — no RCS client uses
+# the carrier-UCE path (Google Messages RCS goes via Jibe); dropped from
+# Mi8937-vendor.mk PRODUCT_PACKAGES too. Apk line kept for reference:
+# -system/app/uceShimService/uceShimService.apk:system_ext/app/uceShimService/uceShimService.apk
 system/framework/com.qualcomm.qti.uceservice-V2.0-java.jar:system_ext/framework/com.qualcomm.qti.uceservice-V2.0-java.jar
 -system/lib64/com.qualcomm.qti.uceservice@2.0.so:system_ext/lib64/com.qualcomm.qti.uceservice@2.0.so;DISABLE_DEPS
 
