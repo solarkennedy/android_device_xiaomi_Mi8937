@@ -89,7 +89,9 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_VENDOR)/lib/overlayfs/pepito/libicui18n.so \
     $(LOCAL_PATH)/configs/blankfile:$(TARGET_COPY_OUT_VENDOR)/lib/overlayfs/pepito/libicuuc.so
 
-# Disable camera builds — missing legacy headers in Lineage 23.2
+# Sibling camera HALs (ulysse/wingtech/land) stay disabled: they need legacy
+# headers Lineage 23.2 no longer ships. pepito does not use them — it builds
+# camera.pepito below — so this is not outstanding work for this device.
 # PRODUCT_PACKAGES += \
 #     camera.ulysse \
 #     camera.wingtech
@@ -107,10 +109,12 @@ PRODUCT_COPY_FILES += \
 # pointed at it via ro.hardware.camera=pepito (rootdir/etc/init.xiaomi.device.rc).
 # The stock AML0 camera.msm8937.so blob (+ libVDBeautyShotAPI + its linker
 # fragment) was retired 2026-07-03.
-# TODO(layering): gate behind TARGET_DEVICE_PEPITO once wired — sibling Mi8937
-# variants select their own camera.<variant>.
+# Sibling Mi8937 variants select their own camera.<variant>, so keep this
+# pepito-scoped.
+ifeq ($(TARGET_DEVICE_PEPITO),true)
 PRODUCT_PACKAGES += \
     camera.pepito
+endif
 
 # Dumpstate
 PRODUCT_PACKAGES += \
