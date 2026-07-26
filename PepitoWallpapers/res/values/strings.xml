@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpapers_label">Palm Wallpapers</string>
+
+    <string name="category_palm">Palm</string>
+    <string name="category_solids">Solid colors</string>
+
+    <string name="wallpaper_water">Water</string>
+    <string name="wallpaper_plant">Plant</string>
+    <string name="wallpaper_heart">Heart</string>
+    <string name="wallpaper_pink">Pink</string>
+    <string name="wallpaper_gold">Gold</string>
+    <string name="wallpaper_donut">Donut</string>
+
+    <string name="solid_black">Black</string>
+    <string name="solid_charcoal">Charcoal</string>
+    <string name="solid_slate">Slate</string>
+    <string name="solid_bone">Bone</string>
+    <string name="solid_indigo">Indigo</string>
+    <string name="solid_blue">Blue</string>
+    <string name="solid_teal">Teal</string>
+    <string name="solid_green">Green</string>
+    <string name="solid_amber">Amber</string>
+    <string name="solid_orange">Orange</string>
+    <string name="solid_crimson">Crimson</string>
+    <string name="solid_plum">Plum</string>
+</resources>
