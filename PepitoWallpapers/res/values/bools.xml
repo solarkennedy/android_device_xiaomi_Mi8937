@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+         Suppresses the built-in Android/Lineage default_wallpaper from the
+         picker's "On-device wallpapers" category, since this package supplies
+         its own collections.
+
+         Read by WallpaperPicker2 DefaultPartnerProvider.shouldHideDefaultWallpaper()
+         as res.getIdentifier("default_wallpapper_hidden", "bool", packageName).
+         The misspelling is NOT a typo on our side - it is baked into
+         PartnerProvider.RES_DEFAULT_WALLPAPER_HIDDEN upstream, where the comment
+         notes it cannot be fixed without breaking existing devices. Renaming it
+         here would silently disable this.
+
+         This only hides the entry in the picker. It does not change which
+         wallpaper the device actually boots with when /data is wiped - that is
+         still framework-res default_wallpaper.
+    -->
+    <bool name="default_wallpapper_hidden">true</bool>
+</resources>

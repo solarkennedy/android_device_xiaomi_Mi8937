@@ -1,0 +1,18 @@
+//
+// Wallpaper partner customization APK for the Palm PVG100 (pepito).
+// Resources only -- no Java sources, hence hasCode="false" in the manifest.
+//
+
+android_app {
+    name: "PepitoWallpapers",
+
+    resource_dirs: ["res"],
+    sdk_version: "current",
+
+    // Nothing to shrink or obfuscate in a resource-only package, and R8 would
+    // otherwise strip resources that are only referenced from res/xml/wallpapers.xml
+    // (the picker resolves them at runtime by resource id).
+    optimize: {
+        enabled: false,
+    },
+}
