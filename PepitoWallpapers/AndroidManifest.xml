@@ -6,7 +6,8 @@
      PackageManager.queryBroadcastReceivers() for ACTION_PARTNER_CUSTOMIZATION,
      and requires ApplicationInfo.FLAG_SYSTEM. The receiver below exists purely
      as that discovery marker - it is never actually broadcast to, which is why
-     it has no implementation class of its own. The picker then reads
+     it has no implementation class of its own (same as Backgrounds' .StubReceiver,
+     which is also a name with no code behind it). The picker then reads
      res/xml/wallpapers.xml straight out of these resources.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -17,9 +18,18 @@
         android:hasCode="false"
         android:allowBackup="false">
 
+        <!--
+             MUST be exported. queryBroadcastReceivers() does not return
+             non-exported components to a caller in another package, so an
+             unexported marker is invisible to the picker no matter that it is
+             correctly declared. Note "adb shell cmd package query-receivers"
+             DOES list it either way - shell bypasses that filtering - so it is
+             not a valid check. Lineage's Backgrounds exports its StubReceiver
+             for exactly this reason.
+        -->
         <receiver
-            android:name="android.content.BroadcastReceiver"
-            android:exported="false">
+            android:name=".StubReceiver"
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.android.launcher3.action.PARTNER_CUSTOMIZATION" />
             </intent-filter>
