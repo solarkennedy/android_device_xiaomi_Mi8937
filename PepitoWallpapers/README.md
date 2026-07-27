@@ -15,9 +15,29 @@ from five sources, and the largest one -- "system categories" -- comes from a
            filtered to ApplicationInfo.FLAG_SYSTEM
       -> partnerRes.getIdentifier("wallpapers", "xml", packageName)
 
-Neither Lineage nor the Mi8937 device tree provides one, so that call returned an
-empty list and the picker offered only "My photos" plus the single built-in
-`default_wallpaper`. This package fills that gap.
+Lineage *does* ship a partner APK -- `Backgrounds` (`org.lineageos.backgrounds`,
+added by `vendor/lineage/config/common_mobile.mk`) -- but it has no
+`res/xml/wallpapers.xml`. It publishes its 11 images through the *legacy*
+`partner_wallpapers` string-array in `res/values/arrays.xml`, and
+`PartnerWallpaperInfo.getAll()` funnels everything that path returns into
+`getOnDeviceCategory()`, the flat "On-device wallpapers" bucket. So
+`getSystemCategories()` found a partner, found no `wallpapers.xml` in it, and
+returned empty: no named collections at all.
+
+Two consequences drive this package's design:
+
+1.  **A device has exactly one partner.** `findSystemApk()` returns on the first
+    matching receiver and never iterates. Shipping alongside `Backgrounds` left
+    this APK installed, discoverable as receiver #1, and permanently unread.
+    Hence `overrides: ["Backgrounds"]` in `Android.bp`.
+2.  **Named collections require `wallpapers.xml`.** The legacy array format can
+    only ever produce the flat on-device bucket. Republishing Lineage's images
+    here is therefore what gives them a collection of their own -- it is not a
+    workaround for having displaced `Backgrounds`, it is the only route to the
+    result.
+
+One partner APK may declare any number of `<category>` blocks, so this package
+supplies three: Palm, LineageOS, and Solid colors.
 
 ## Provenance of the images
 
@@ -33,6 +53,15 @@ All six are 720x1280, i.e. exactly the FT8613 panel resolution -- no rescaling w
 applied. The `*_small.jpg` thumbnails that sat alongside them were deliberately
 *not* copied: WallpaperPicker2 generates its own thumbnails when the optional
 `thumbnail` attribute is absent, so shipping them would waste ~300 KB.
+
+## The LineageOS collection
+
+The 11 images carried over from `packages/apps/Backgrounds` are exactly the ones
+its `res/values/arrays.xml` publishes -- `ascension_teal_dark.jpg` sits in that
+app's `drawable-nodpi` but is absent from the array, so it never appeared in the
+picker and is not copied here. They are verbatim (2560x2560, Apache-2.0), which
+is far larger than the 720x1280 panel needs; downscaling them is an easy ~6 MiB
+saving if image size ever matters more than fidelity to upstream.
 
 ## Solid colours
 

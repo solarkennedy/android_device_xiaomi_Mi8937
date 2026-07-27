@@ -51,11 +51,12 @@ ifeq ($(TARGET_DEVICE_PEPITO),true)
 # PepitoLauncher2: stock-Palm-launcher reimplementation, ships alongside
 # Trebuchet (not default). Source: packages/apps/PepitoLauncher2, a clone of
 # the canonical repo at ~/Projects/PepitoLauncher2 (PLAN-pepitolauncher2.md).
-# PepitoWallpapers: wallpaper partner customization APK. Lineage ships no
-# partner APK at all, so WallpaperPicker2's system categories come up empty and
-# the picker offers only "My photos" plus the single built-in default. This
-# restores the six stock Palm 8.1 wallpapers (720x1280, matching the panel) and
-# adds a generated solid-colour set.
+# PepitoWallpapers: wallpaper partner customization APK. A device has exactly one
+# wallpaper partner, and Lineage's Backgrounds app holds the slot while providing
+# only the legacy flat "On-device wallpapers" bucket, so WallpaperPicker2 showed no
+# named collections. This overrides Backgrounds (see its Android.bp) and publishes
+# three: the six stock Palm 8.1 wallpapers, Lineage's own 11 carried over intact,
+# and a generated solid-colour set.
 PRODUCT_PACKAGES += \
     PepitoLauncher2 \
     PepitoWallpapers \

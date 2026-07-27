@@ -6,6 +6,14 @@
 android_app {
     name: "PepitoWallpapers",
 
+    // A device has exactly ONE wallpaper partner: DefaultPartnerProvider
+    // .findSystemApk() returns the first receiver matching
+    // ACTION_PARTNER_CUSTOMIZATION and never iterates further. Lineage's
+    // Backgrounds app claims that slot (vendor/lineage/config/common_mobile.mk),
+    // so shipping alongside it left this package installed but never read.
+    // Replace it outright; its 11 wallpapers are carried over in res/.
+    overrides: ["Backgrounds"],
+
     resource_dirs: ["res"],
     sdk_version: "current",
 
