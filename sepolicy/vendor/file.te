@@ -1,6 +1,9 @@
 # BHy sensor hub sysfs
 type sysfs_bhy, fs_type, sysfs_type;
 
+# BHy sensor hub calibration profiles (/data/misc/sensor)
+type bhy_data_file, file_type, data_file_type, core_data_file_type;
+
 # Camera
 type sysfs_camera_fusion_id, fs_type, sysfs_type;
 

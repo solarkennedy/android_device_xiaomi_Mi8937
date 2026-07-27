@@ -32,3 +32,8 @@
 # by-name entries (harmless on siblings, where the paths never exist).
 /dev/block/platform/soc/7824900\.sdhci/by-name/tunning	u:object_r:modem_efs_partition_device:s0
 /dev/block/platform/soc/7824900\.sdhci/by-name/simlock	u:object_r:modem_efs_partition_device:s0
+
+# BHy sensor hub (BHI160B) calibration profiles. Created by init.target.rc;
+# the BST HAL (sensors.native.so) hardcodes /data/misc/sensor. Stock labels
+# this identically (nonplat_file_contexts: bhy_data_file).
+/data/misc/sensor(/.*)?		u:object_r:bhy_data_file:s0
