@@ -3,6 +3,7 @@
     <string name="wallpapers_label">Palm Wallpapers</string>
 
     <string name="category_palm">Palm</string>
+    <string name="category_lineage">LineageOS</string>
     <string name="category_solids">Solid colors</string>
 
     <string name="wallpaper_water">Water</string>
@@ -11,6 +12,18 @@
     <string name="wallpaper_pink">Pink</string>
     <string name="wallpaper_gold">Gold</string>
     <string name="wallpaper_donut">Donut</string>
+
+    <string name="lineage_blaze">Blaze</string>
+    <string name="lineage_ice">Ice</string>
+    <string name="lineage_mist">Mist</string>
+    <string name="lineage_shade">Shade</string>
+    <string name="lineage_sunset">Sunset</string>
+    <string name="lineage_teal">Teal</string>
+    <string name="lineage_expansion">Expansion</string>
+    <string name="lineage_operation">Operation</string>
+    <string name="lineage_progression">Progression</string>
+    <string name="lineage_propulsion">Propulsion</string>
+    <string name="lineage_tessellation">Tessellation</string>
 
     <string name="solid_black">Black</string>
     <string name="solid_charcoal">Charcoal</string>
