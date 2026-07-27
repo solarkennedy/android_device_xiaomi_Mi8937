@@ -73,6 +73,16 @@ drawables, because `ResourceAsset.openInputStream()` pipes
 drawable decodes to null and the tile renders blank. A flat 720x1280 PNG costs
 ~4 KB, so the whole set is smaller than one photographic wallpaper.
 
+## Gotchas
+
+- **The marker receiver must be `android:exported="true"`.**
+  `queryBroadcastReceivers()` does not return non-exported components to a caller
+  in a different package, so an unexported marker is invisible to the picker even
+  though everything else is correct. This cost a flash cycle to find, because
+  `adb shell cmd package query-receivers -a com.android.launcher3.action.PARTNER_CUSTOMIZATION`
+  lists it regardless -- shell bypasses the filtering -- so that command is NOT a
+  valid way to confirm the picker can see this package.
+
 ## Gotchas if you edit res/xml/wallpapers.xml
 
 - `title` and `src` are read with `getAttributeResourceValue()`, so they must be
