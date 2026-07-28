@@ -11,6 +11,7 @@
 #include "vendor_init.h"
 
 #include <android-base/file.h>
+#include <android-base/properties.h>
 #include <fstab/fstab.h>
 
 static const variant_info_t ugglite_info = {
@@ -85,6 +86,50 @@ static const variant_info_t pepito_info = {
     .dpi = 264,
 };
 
+static void replace_all(std::string& s, const std::string& from, const std::string& to)
+{
+    if (from.empty())
+        return;
+    size_t pos = 0;
+    while ((pos = s.find(from, pos)) != std::string::npos) {
+        s.replace(pos, from.length(), to);
+        pos += to.length();
+    }
+}
+
+// Normalize the public device identity from the Mi8937-common BUILD codename to
+// the real Palm PVG100/pepito. The fingerprint's product/device fields come
+// from TARGET_PRODUCT (lineage_Mi8937[_gapps]) and TARGET_DEVICE (Mi8937),
+// which also name the build output dir / lunch combos and so can't be renamed
+// cheaply -- but the runtime props can be. Derive the corrected fingerprint
+// from the LIVE one so every dynamic field (version, build id, incremental,
+// security patch, variant, tags) stays truthful; only the codename tokens
+// change. No-op if the fingerprint is unreadable or already clean, so this can
+// never wedge boot. ro.product.name is fixed to match (stock reports PVG100).
+static void set_pepito_identity()
+{
+    std::string fp = android::base::GetProperty("ro.build.fingerprint", "");
+    if (fp.empty() || fp.find("Mi8937") == std::string::npos)
+        return;
+
+    // Replace the product token(s) first (they embed "Mi8937"), then the bare
+    // device token, so the device pass can't corrupt the product field. The
+    // product field is TARGET_PRODUCT: lineage_Mi8937_gapps (gapps) or
+    // lineage_Mi8937 (vanilla) -- match the longer one first. NB: matched as a
+    // literal rather than read from ro.product.name, because the aggregate
+    // ro.product.name is NOT populated yet at vendor_load_properties time (init
+    // assembles it later from the per-partition props); only static props like
+    // ro.build.fingerprint are readable this early.
+    replace_all(fp, "lineage_Mi8937_gapps", "PVG100");
+    replace_all(fp, "lineage_Mi8937", "PVG100");
+    replace_all(fp, "Mi8937", "pepito");
+
+    set_ro_build_prop("fingerprint", fp);
+    property_override("ro.bootimage.build.fingerprint", fp);
+    property_override("ro.build.description", fingerprint_to_description(fp));
+    set_ro_build_prop("name", "PVG100", true);
+}
+
 static void determine_device()
 {
     std::string codename;
@@ -119,6 +164,7 @@ static void determine_device()
     } else if (codename == "pepito") {
         set_variant_props(pepito_info);
         property_override("ro.vendor.qmux.enable", "1");
+        set_pepito_identity();
     } else if (codename == "ugg") {
         set_variant_props(ugg_info);
     }
