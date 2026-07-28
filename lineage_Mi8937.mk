@@ -81,13 +81,9 @@ TARGET_VENDOR := Palm
 
 PRODUCT_GMS_CLIENTID_BASE := android-palm
 
-# SYSTEM-WIDE certified-identity override for Play Protect *certification*.
-# Certification is a checkin/fingerprint-match gate, and checkin reads the
-# NATIVE build props (a GMS-scoped Java Build.* hook could NOT reach them), so
-# the real certified Palm 8.1 fingerprint is set here. ro.build.version.sdk is
-# deliberately left real (36) so the Play Store catalog stays modern rather
-# than filtering to 8.1-era apps. This does NOT affect Play Integrity, which
-# reads the TEE's sealed attestation (RootOfTrust), not props.
-PRODUCT_BUILD_PROP_OVERRIDES += \
-    BuildDesc="pepito-user 8.1.0 OPM1.171019.019 v1AML-0 release-keys" \
-    BuildFingerprint=Palm/PVG100/Pepito:8.1.0/OPM1.171019.019/v1AML-0:user/release-keys
+# NOTE: no build-prop / fingerprint override here — the device ships its honest
+# Android 16 fingerprint. A stock-8.1 fingerprint mimic was trialled and dropped
+# (2026-07-27): it buys neither Play Protect certification (handled by GSF-ID
+# uncertified registration) nor Play Integrity (which reads the TEE's sealed
+# attestation, not props). Play Integrity -12 on this device is a server-side
+# recognition/500, not a build-tunable. Full lane writeup: PLAN-integrity.md.
