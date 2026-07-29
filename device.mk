@@ -211,6 +211,13 @@ PRODUCT_COPY_FILES += \
 
 # LiveDisplay
 $(call soong_config_set_bool,livedisplay_sysfs,enable_re,true)
+# Sunlight Enhancement backed by the kernel's DSPP hist-LUT tone curve.
+# SE_PATH must be pinned: the default probe checks fb0/hbm first, and at HAL
+# start (class hal) the upstream rc has already chowned hbm to system while
+# the init.xiaomi.device.rc chmod 0000 only lands at "on boot" — the probe
+# wins the race and binds the dead hbm stub (writes then fail all session)
+$(call soong_config_set_bool,livedisplay_sysfs,enable_se,true)
+$(call soong_config_set,livedisplay_sysfs,se_path,/sys/class/graphics/fb0/sre)
 
 # Placeholder
 PRODUCT_COPY_FILES += \
