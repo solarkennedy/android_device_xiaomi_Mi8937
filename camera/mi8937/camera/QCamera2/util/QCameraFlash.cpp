@@ -30,6 +30,8 @@
 // System dependencies
 #include <stdio.h>
 #include <fcntl.h>
+#include <unistd.h>
+#include <linux/media.h>
 #ifdef USE_LATEST_CAMERA_STACK
 #include <media/msm_cam_sensor.h>
 #else
@@ -122,6 +124,63 @@ int32_t QCameraFlash::registerCallbacks(
 }
 
 /*===========================================================================
+ * FUNCTION   : findFlashNode
+ *
+ * DESCRIPTION: Discover the flash device node from the media controller,
+ *              matching the MSM_CAMERA_SUBDEV_FLASH entity the same way the
+ *              camera-count probe in mm_camera_interface matches sensors.
+ *              The backend is expected to report the node in
+ *              cam_capability_t.flash_dev_name; a backend built against a
+ *              different cam_intf layout leaves it empty, so recover here.
+ *
+ * PARAMETERS :
+ *   @flashNode : Output buffer for the flash device node name.
+ *
+ * RETURN     : None; flashNode is left untouched if no entity matches.
+ *==========================================================================*/
+static void findFlashNode(char (&flashNode)[QCAMERA_MAX_FILEPATH_LENGTH])
+{
+    int num_media_devices = 0;
+
+    while ('\0' == flashNode[0]) {
+        char dev_name[32];
+        snprintf(dev_name, sizeof(dev_name), "/dev/media%d",
+                num_media_devices++);
+        int dev_fd = open(dev_name, O_RDWR | O_NONBLOCK);
+        if (dev_fd < 0) {
+            break;
+        }
+
+        struct media_device_info mdev_info;
+        memset(&mdev_info, 0, sizeof(mdev_info));
+        if ((ioctl(dev_fd, MEDIA_IOC_DEVICE_INFO, &mdev_info) < 0) ||
+                (strncmp(mdev_info.model, MSM_CONFIGURATION_NAME,
+                        sizeof(mdev_info.model)) != 0)) {
+            close(dev_fd);
+            continue;
+        }
+
+        unsigned int num_entities = 1;
+        while (1) {
+            struct media_entity_desc entity;
+            memset(&entity, 0, sizeof(entity));
+            entity.id = num_entities++;
+            if (ioctl(dev_fd, MEDIA_IOC_ENUM_ENTITIES, &entity) < 0) {
+                break;
+            }
+            if ((entity.type == MEDIA_ENT_T_V4L2_SUBDEV) &&
+                    (entity.group_id == MSM_CAMERA_SUBDEV_FLASH)) {
+                strlcpy(flashNode, entity.name, sizeof(flashNode));
+                LOGI("discovered flash node '%s' on %s",
+                        flashNode, dev_name);
+                break;
+            }
+        }
+        close(dev_fd);
+    }
+}
+
+/*===========================================================================
  * FUNCTION   : initFlash
  *
  * DESCRIPTION: Reserve and initialize the flash unit associated with a
@@ -158,6 +217,18 @@ int32_t QCameraFlash::initFlash(const int camera_id)
     strlcat(flashPath,
             flashNode,
             sizeof(flashPath));
+
+    /* The backend's flash_dev_name is unreliable here: a backend built
+     * against a different cam_intf layout reports empty or garbage bytes
+     * (seen: 0x0c) at that offset. Only trust it if it names a device
+     * node that actually exists; otherwise discover the node from the
+     * media controller. */
+    if (hasFlash &&
+            (('\0' == flashNode[0]) || (access(flashPath, F_OK) != 0))) {
+        flashNode[0] = '\0';
+        findFlashNode(flashNode);
+        snprintf(flashPath, sizeof(flashPath), "/dev/%s", flashNode);
+    }
 
     if (!hasFlash) {
         LOGE("No flash available for camera id: %d",
