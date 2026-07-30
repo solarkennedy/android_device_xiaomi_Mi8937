@@ -46,10 +46,10 @@
     <item name="camera.avg">220</item>
     <item name="gps.on">70</item>
     <item name="radio.active">150</item>
-    <item name="radio.scanning">55</item>
+    <item name="radio.scanning">140</item>
     <array name="radio.on">
-        <value>8</value>
-        <value>6</value>
+        <value>1.5</value>
+        <value>1.5</value>
     </array>
     <item name="battery.capacity">800</item>
     <item name="bluetooth.controller.voltage">3300</item>
