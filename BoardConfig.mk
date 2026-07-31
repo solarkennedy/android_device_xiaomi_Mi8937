@@ -105,6 +105,16 @@ endif
 
 # Root extra folders
 BOARD_ROOT_EXTRA_FOLDERS := metadata
+# pepito: /persist must be a REAL dir (not the /mnt/vendor/persist symlink) —
+# Palm's stock sensor registry daemon (sensors.qti) rejects the symlinked path,
+# ADSP SMGR then aborts and no SSC prox/ALS sensors come up (kills
+# auto-brightness). init.target.rc bind-mounts the persist partition onto it.
+# create_root_structure.mk consumes this during the build, unlike the racy
+# pre-build $OUT/root fixup in scripts/build-lineage23.sh that a root-staging
+# regeneration silently dropped (2026-07-30 build). See PLAN-sensors.md.
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+BOARD_ROOT_EXTRA_FOLDERS += persist
+endif
 
 # Recovery
 TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/rootdir/etc/fstab.qcom
