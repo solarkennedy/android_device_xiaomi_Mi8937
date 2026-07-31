@@ -57,7 +57,21 @@ ifeq ($(TARGET_DEVICE_PEPITO),true)
 # named collections. This overrides Backgrounds (see its Android.bp) and publishes
 # three: the six stock Palm 8.1 wallpapers, Lineage's own 11 carried over intact,
 # and a generated solid-colour set.
+# OpenEUICC (privileged variant): LPA for managing eSIM profiles on the removable
+# eUICC adapter card that lives in the SIM tray. Drives the card through a USB CCID
+# reader attached in OTG host mode -- validated 2026-07-30.
+#
+# It canNOT reach the card in the tray: this modem refuses to open a logical channel
+# to the eUICC ISD-R AID (RIL 54 OPERATION_NOT_ALLOWED / QMI 82 ACCESS_DENIED) even
+# from qcrild, while opening ARA-M on the same card fine -- MPSS.TA.2.3 predates
+# SGP.22. Nothing on the AP side can change that; see PLAN-esim-lpa.md before
+# revisiting the app/permission/sepolicy angle.
+#
+# Source: packages/apps/OpenEUICC (upstream + two local fixes), prebuilt deps:
+# prebuilts/openeuicc-deps. Its Android.bp is platform-signed + privileged and pulls
+# in privapp_whitelist_im.angry.openeuicc.xml via `required`.
 PRODUCT_PACKAGES += \
+    OpenEUICC \
     PepitoLauncher2 \
     PepitoWallpapers \
     VolumeTile \
