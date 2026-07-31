@@ -23,4 +23,10 @@
          (and its REQUEST_COMPANION_PROFILE_AUTOMOTIVE_PROJECTION permission) so it can create the
          CompanionDeviceManager automotive-projection association required for wired Android Auto. -->
     <string name="config_systemAutomotiveProjection" translatable="false">com.google.android.projection.gearhead</string>
+
+    <!-- Default holder of the ASSISTANT role. With the Google app baked into the gapps build
+         (vendor/pepito-gapps GoogleSearch payload) the role would otherwise start empty on a
+         fresh flash, which kills Android Auto voice commands. Harmless on the vanilla target:
+         if the package doesn't exist the role simply stays empty as before. -->
+    <string name="config_defaultAssistant" translatable="false">com.google.android.googlequicksearchbox</string>
 </resources>

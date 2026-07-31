@@ -16,4 +16,11 @@
 $(call inherit-product, device/xiaomi/Mi8937/lineage_Mi8937.mk)
 $(call inherit-product, vendor/pepito-gapps/gapps.mk)
 
+# The Google app (Velvet) ships as a priv-app in the NikGapps GoogleSearch
+# payload; the ASSISTANT role itself doesn't grant RECORD_AUDIO, and Android
+# Auto can't prompt for it while projecting, so pregrant the mic here
+# (gapps-only file: vanilla builds don't ship the package).
+PRODUCT_COPY_FILES += \
+    device/xiaomi/Mi8937/permissions/default-permissions-google-search.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/default-permissions/default-permissions-google-search.xml
+
 PRODUCT_NAME := lineage_Mi8937_gapps

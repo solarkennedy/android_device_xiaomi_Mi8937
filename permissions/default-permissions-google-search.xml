@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pregrants for the baked-in Google app (vendor/pepito-gapps GoogleSearch payload).
+     The ASSISTANT role does NOT grant RECORD_AUDIO (verified in PermissionController
+     roles.xml), and Android Auto cannot surface a runtime permission prompt while
+     projecting, so without this pregrant AA voice commands fail silently on a fresh
+     flash until the mic is granted by hand on the phone (see PLAN-release.md,
+     2026-07-18 debug). fixed="false" keeps it user-revocable. -->
+<exceptions>
+    <exception package="com.google.android.googlequicksearchbox">
+        <!-- Microphone: AA voice recognizer / "Ok Google" -->
+        <permission name="android.permission.RECORD_AUDIO" fixed="false" />
+        <permission name="android.permission.POST_NOTIFICATIONS" fixed="false" />
+    </exception>
+</exceptions>
