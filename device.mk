@@ -147,6 +147,18 @@ PRODUCT_PACKAGES += \
     tune2fs_ramdisk \
     resize2fs_ramdisk
 
+# exFAT tooling for removable storage (SD card on the siblings, USB OTG on
+# pepito). vold's Exfat.cpp shells out to these two paths and refuses to mount
+# unless both exist; the kernel driver alone is not enough. NTFS is already
+# covered by vendor/lineage/config/common.mk (ntfs-3g over FUSE).
+PRODUCT_PACKAGES += \
+    fsck.exfat \
+    mkfs.exfat
+
+PRODUCT_ARTIFACT_PATH_REQUIREMENT_ALLOWED_LIST += \
+    system/bin/fsck.exfat \
+    system/bin/mkfs.exfat
+
 # Enable project quotas and casefolding for emulated storage without sdcardfs
 $(call inherit-product, $(SRC_TARGET_DIR)/product/emulated_storage.mk)
 
