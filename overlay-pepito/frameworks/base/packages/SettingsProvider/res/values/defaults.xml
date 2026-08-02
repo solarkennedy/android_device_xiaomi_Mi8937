@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pepito: default all three animation scales to 0.5x (PLAN-perf-battery.md
+     responsiveness lane, 2026-08-02). On slow hardware this is the single most
+     perceptible "feels fast" default; users can still pick 1x in Developer
+     options. Seeded into Settings.Global at settings-DB creation only (clean
+     flash / zeroed userdata - our release flashes always zero userdata).
+     animator scale seeding needs our frameworks/base DatabaseHelper patch. -->
+<resources>
+    <fraction name="def_window_animation_scale">50%</fraction>
+    <fraction name="def_window_transition_scale">50%</fraction>
+    <fraction name="def_animator_duration_scale">50%</fraction>
+</resources>

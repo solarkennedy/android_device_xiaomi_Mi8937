@@ -34,6 +34,12 @@ $(call soong_config_set,libinit,vendor_init_lib,//$(LOCAL_PATH):init_xiaomi_mi89
 DEVICE_PACKAGE_OVERLAYS += \
     $(LOCAL_PATH)/overlay
 
+# Pepito-only defaults (0.5x animation scales - see the overlay's comment)
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+DEVICE_PACKAGE_OVERLAYS += \
+    $(LOCAL_PATH)/overlay-pepito
+endif
+
 ifeq ($(PRODUCT_HARDWARE),Mi8917)
 PRODUCT_PACKAGES += \
     xiaomi_rolex_overlay \
