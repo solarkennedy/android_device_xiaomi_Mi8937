@@ -65,6 +65,13 @@ private:
             int32_t cameraId, uint32_t halVersion, struct hw_device_t** hw_device);
     int setTorchMode(const char* camera_id, bool on);
 public:
+    /* Torch strength. The legacy camera_module_t API is boolean-only, so these
+     * are reached from the AIDL provider through the qcamera_torch_* vendor
+     * symbols at the bottom of QCamera2Factory.cpp -- which are free functions,
+     * so unlike setTorchMode() these must be public. */
+    int setTorchStrength(const char* camera_id, int level);
+    int getTorchStrength(const char* camera_id, int* level);
+
     static struct hw_module_methods_t mModuleMethods;
 
 private:

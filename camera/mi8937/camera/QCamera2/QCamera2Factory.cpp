@@ -594,6 +594,161 @@ int QCamera2Factory::setTorchMode(const char* camera_id, bool on)
 }
 
 /*===========================================================================
+ * FUNCTION   : parseCameraId
+ *
+ * DESCRIPTION: Validate a framework camera-id string and convert it.
+ *
+ * PARAMETERS :
+ *   @camera_id : camera ID string
+ *   @out       : parsed id on success
+ *
+ * RETURN     : 0  -- success
+ *              -EINVAL on a malformed or out-of-range id
+ *==========================================================================*/
+static int parseCameraId(const char* camera_id, int* out)
+{
+    long cameraIdLong(-1);
+    char* endPointer = NULL;
+
+    if (camera_id == NULL || out == NULL) {
+        return -EINVAL;
+    }
+
+    errno = 0;
+    cameraIdLong = strtol(camera_id, &endPointer, 10);
+
+    if ((errno == ERANGE) ||
+            (cameraIdLong < 0) ||
+            (cameraIdLong >= static_cast<long>(
+                    QCamera2Factory::get_number_of_cameras())) ||
+            (endPointer == camera_id) ||
+            (*endPointer != '\0')) {
+        return -EINVAL;
+    }
+
+    *out = static_cast<int>(cameraIdLong);
+    return 0;
+}
+
+/*===========================================================================
+ * FUNCTION   : setTorchStrength
+ *
+ * DESCRIPTION: Turn the torch on at a given strength level. Mirrors
+ *              setTorchMode(on=true) but programs the level first, so the
+ *              initial turn-on already uses the requested current rather than
+ *              lighting at the old level and stepping.
+ *
+ * PARAMETERS :
+ *   @camera_id : camera ID
+ *   @level     : 1..QCAMERA_TORCH_LEVEL_MAX
+ *
+ * RETURN     : 0  -- success
+ *              none-zero failure code
+ *==========================================================================*/
+int QCamera2Factory::setTorchStrength(const char* camera_id, int level)
+{
+    int retVal(0);
+    int cameraIdInt(-1);
+    QCameraFlash& flash = QCameraFlash::getInstance();
+
+    retVal = parseCameraId(camera_id, &cameraIdInt);
+    if (retVal != 0) {
+        return retVal;
+    }
+
+    retVal = flash.initFlash(cameraIdInt);
+    if (retVal != 0) {
+        return retVal;
+    }
+
+    /* Program the level before lighting so a cold turn-on uses it directly. */
+    retVal = flash.setTorchLevel(cameraIdInt, level);
+    if (retVal != 0) {
+        return retVal;
+    }
+
+    retVal = flash.setFlashMode(cameraIdInt, true);
+    if (retVal == 0) {
+        if (mCallbacks != NULL) {
+            mCallbacks->torch_mode_status_change(mCallbacks,
+                    camera_id,
+                    TORCH_MODE_STATUS_AVAILABLE_ON);
+        }
+    } else if (retVal == -EALREADY) {
+        /* Already lit; setTorchLevel() above has re-issued at the new
+         * current, which is exactly what a slider drag wants. */
+        retVal = 0;
+    }
+
+    return retVal;
+}
+
+/*===========================================================================
+ * FUNCTION   : getTorchStrength
+ *
+ * DESCRIPTION: Read back the torch strength level for a camera.
+ *
+ * PARAMETERS :
+ *   @camera_id : camera ID
+ *   @level     : receives the level
+ *
+ * RETURN     : 0  -- success
+ *              none-zero failure code
+ *==========================================================================*/
+int QCamera2Factory::getTorchStrength(const char* camera_id, int* level)
+{
+    int retVal(0);
+    int cameraIdInt(-1);
+    int32_t current(0);
+    QCameraFlash& flash = QCameraFlash::getInstance();
+
+    if (level == NULL) {
+        return -EINVAL;
+    }
+
+    retVal = parseCameraId(camera_id, &cameraIdInt);
+    if (retVal != 0) {
+        return retVal;
+    }
+
+    current = flash.getTorchLevel(cameraIdInt);
+    if (current < 0) {
+        return current;
+    }
+
+    *level = current;
+    return 0;
+}
+
+/* Vendor bridge for torch strength.
+ *
+ * The legacy camera_module_t ABI has only set_torch_mode(id, bool) -- there is
+ * no strength entry point -- so the AIDL provider cannot reach the level
+ * through the module struct. Both halves of this are ours (camera.pepito and
+ * hardware/lineage/interfaces/camera/aidl), so the provider dlsym()s these two
+ * symbols out of the already-loaded HAL via hw_module_t::dso and falls back to
+ * OPERATION_NOT_SUPPORTED when they are absent, which keeps every other
+ * legacy-HAL Lineage device behaving exactly as before.
+ *
+ * Keep the names and signatures in sync with CameraDevice.cpp.
+ */
+extern "C" int qcamera_torch_set_strength(const char* camera_id, int level)
+{
+    if (gQCamera2Factory == NULL) {
+        return -ENODEV;
+    }
+    return gQCamera2Factory->setTorchStrength(camera_id, level);
+}
+
+extern "C" int qcamera_torch_get_strength(const char* camera_id, int* level)
+{
+    if (gQCamera2Factory == NULL) {
+        return -ENODEV;
+    }
+    return gQCamera2Factory->getTorchStrength(camera_id, level);
+}
+
+/*===========================================================================
  * FUNCTION   : isDualCamAvailable
  *
  * DESCRIPTION: Function to check whether we have dual Camera HW available

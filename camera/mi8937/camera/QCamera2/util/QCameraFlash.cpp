@@ -52,6 +52,33 @@ volatile uint32_t gCamHal3LogLevel = 1;
 
 namespace qcamera {
 
+/* index [1..QCAMERA_TORCH_LEVEL_MAX]; index 0 is unused (level 0 == off).
+ * See the constraints documented in QCameraFlash.h: the top entry is 199 and
+ * not 200 because msm_flash_low() honours a requested current only when it is
+ * STRICTLY below qcom,max-current, and level 3 is 120 mA so that the default
+ * reproduces the pre-slider behaviour exactly. */
+static const int32_t kTorchCurrentMa[QCAMERA_TORCH_LEVEL_MAX + 1] = {
+    0, 40, 80, 120, 160, 199
+};
+
+/*===========================================================================
+ * FUNCTION   : qcameraTorchLevelToCurrentMa
+ *
+ * DESCRIPTION: Map a torch strength level to its LED current.
+ *
+ * PARAMETERS :
+ *   @level : 1..QCAMERA_TORCH_LEVEL_MAX; anything else yields the default
+ *
+ * RETURN     : current in mA
+ *==========================================================================*/
+int32_t qcameraTorchLevelToCurrentMa(int32_t level)
+{
+    if (level < 1 || level > QCAMERA_TORCH_LEVEL_MAX) {
+        level = QCAMERA_TORCH_LEVEL_DEFAULT;
+    }
+    return kTorchCurrentMa[level];
+}
+
 /*===========================================================================
  * FUNCTION   : getInstance
  *
@@ -82,6 +109,7 @@ QCameraFlash::QCameraFlash() : m_callbacks(NULL)
     memset(&m_cameraOpen, 0, sizeof(m_cameraOpen));
     for (int pos = 0; pos < MM_CAMERA_MAX_NUM_SENSORS; pos++) {
         m_flashFds[pos] = -1;
+        m_torchLevel[pos] = QCAMERA_TORCH_LEVEL_DEFAULT;
     }
 }
 
@@ -294,7 +322,6 @@ int32_t QCameraFlash::initFlash(const int camera_id)
 int32_t QCameraFlash::setFlashMode(const int camera_id, const bool mode)
 {
     int32_t retVal = 0;
-    struct msm_flash_cfg_data_t cfg;
 
     if (camera_id < 0 || camera_id >= MM_CAMERA_MAX_NUM_SENSORS) {
         LOGE("Invalid camera id: %d", camera_id);
@@ -308,23 +335,141 @@ int32_t QCameraFlash::setFlashMode(const int camera_id, const bool mode)
         LOGE("called for uninited flash: %d", camera_id);
         retVal = -EINVAL;
     }  else {
-        memset(&cfg, 0, sizeof(struct msm_flash_cfg_data_t));
-        for (int i = 0; i < MAX_LED_TRIGGERS; i++)
-            cfg.flash_current[i] = QCAMERA_TORCH_CURRENT_VALUE;
-        cfg.cfg_type = mode ? CFG_FLASH_LOW: CFG_FLASH_OFF;
-
-        retVal = ioctl(m_flashFds[camera_id],
-                        VIDIOC_MSM_FLASH_CFG,
-                        &cfg);
-        if (retVal < 0) {
-            LOGE("Unable to change flash mode to %d for camera id: %d",
-                     mode, camera_id);
-        } else
-        {
-            m_flashOn[camera_id] = mode;
-        }
+        retVal = applyFlashState(camera_id, mode);
     }
     return retVal;
+}
+
+/*===========================================================================
+ * FUNCTION   : applyFlashState
+ *
+ * DESCRIPTION: Issue CFG_FLASH_LOW (at the camera's current torch level) or
+ *              CFG_FLASH_OFF. Caller must have validated camera_id and fd.
+ *
+ * PARAMETERS :
+ *   @camera_id  : Camera id of the flash
+ *   @on         : Whether to turn flash on (true) or off (false)
+ *
+ * RETURN     :
+ *   0        : success
+ *   non-zero : ioctl failure
+ *==========================================================================*/
+int32_t QCameraFlash::applyFlashState(const int camera_id, const bool on)
+{
+    struct msm_flash_cfg_data_t cfg;
+    int32_t retVal = 0;
+    int32_t level = m_torchLevel[camera_id];
+    int32_t currentMa = qcameraTorchLevelToCurrentMa(level);
+
+    /* ⭐ msm_flash_config() accepts CFG_FLASH_LOW ONLY from MSM_CAMERA_FLASH_OFF
+     * or MSM_CAMERA_FLASH_INIT (msm_flash.c:767). Re-issuing LOW while the torch
+     * is already lit -- exactly what a strength change does -- lands in the
+     * else branch and is dropped.
+     *
+     * That rejection is invisible from userspace: the branch is CDBG-only and
+     * msm_flash_config() leaves rc at 0, so the ioctl still "succeeds". This
+     * cost a debugging session: CameraService logged every level change as a
+     * success while the LED never moved, and the kernel said nothing until
+     * `echo "file msm_flash.c +p" > /sys/kernel/debug/dynamic_debug/control`
+     * revealed "Invalid state : 2" (2 == MSM_CAMERA_FLASH_LOW).
+     *
+     * Worse, the silent drop desyncs us from the driver: we set m_flashOn while
+     * flash_state stays LOW, and a torch that never turns back on is the result.
+     *
+     * So step through OFF whenever turning on. From LOW that is a real
+     * transition; from OFF or RELEASE it is a harmless no-op that leaves the
+     * state exactly where LOW needs it. This also re-syncs the driver whenever
+     * m_flashOn has drifted from flash_state. */
+    if (on) {
+        memset(&cfg, 0, sizeof(struct msm_flash_cfg_data_t));
+        cfg.cfg_type = CFG_FLASH_OFF;
+        if (ioctl(m_flashFds[camera_id], VIDIOC_MSM_FLASH_CFG, &cfg) < 0) {
+            LOGD("pre-LOW CFG_FLASH_OFF failed for camera id: %d (continuing)",
+                     camera_id);
+        }
+    }
+
+    memset(&cfg, 0, sizeof(struct msm_flash_cfg_data_t));
+    for (int i = 0; i < MAX_LED_TRIGGERS; i++)
+        cfg.flash_current[i] = currentMa;
+    cfg.cfg_type = on ? CFG_FLASH_LOW: CFG_FLASH_OFF;
+
+    retVal = ioctl(m_flashFds[camera_id],
+                    VIDIOC_MSM_FLASH_CFG,
+                    &cfg);
+    if (retVal < 0) {
+        LOGE("Unable to change flash mode to %d (level %d, %d mA) for camera id: %d",
+                 on, level, currentMa, camera_id);
+    } else {
+        /* LOGI, not LOGD: the driver drops out-of-state requests silently and
+         * still returns 0, so this line is the only userspace-visible record of
+         * what the torch was actually asked for. Cheap -- it fires on tile
+         * taps and slider moves, not per frame. */
+        LOGI("flash %d -> %d at level %d (%d mA)",
+                 camera_id, on, level, currentMa);
+        m_flashOn[camera_id] = on;
+    }
+    return retVal;
+}
+
+/*===========================================================================
+ * FUNCTION   : setTorchLevel
+ *
+ * DESCRIPTION: Set the torch strength level for a camera. If the torch is
+ *              already lit, the new current is applied immediately so the
+ *              SystemUI slider tracks live; otherwise it takes effect on the
+ *              next turn-on.
+ *
+ * PARAMETERS :
+ *   @camera_id : Camera id of the flash
+ *   @level     : 1..QCAMERA_TORCH_LEVEL_MAX
+ *
+ * RETURN     :
+ *   0        : success
+ *   -EINVAL  : bad camera id or level
+ *==========================================================================*/
+int32_t QCameraFlash::setTorchLevel(const int camera_id, const int level)
+{
+    if (camera_id < 0 || camera_id >= MM_CAMERA_MAX_NUM_SENSORS) {
+        LOGE("Invalid camera id: %d", camera_id);
+        return -EINVAL;
+    }
+
+    if (level < 1 || level > QCAMERA_TORCH_LEVEL_MAX) {
+        LOGE("Invalid torch level %d for camera id: %d", level, camera_id);
+        return -EINVAL;
+    }
+
+    m_torchLevel[camera_id] = level;
+
+    /* Re-issue at the new current only when the torch is already lit. */
+    if (m_flashOn[camera_id] && m_flashFds[camera_id] >= 0) {
+        return applyFlashState(camera_id, true);
+    }
+
+    return 0;
+}
+
+/*===========================================================================
+ * FUNCTION   : getTorchLevel
+ *
+ * DESCRIPTION: Current torch strength level for a camera.
+ *
+ * PARAMETERS :
+ *   @camera_id : Camera id of the flash
+ *
+ * RETURN     :
+ *   >0       : the level
+ *   -EINVAL  : bad camera id
+ *==========================================================================*/
+int32_t QCameraFlash::getTorchLevel(const int camera_id)
+{
+    if (camera_id < 0 || camera_id >= MM_CAMERA_MAX_NUM_SENSORS) {
+        LOGE("Invalid camera id: %d", camera_id);
+        return -EINVAL;
+    }
+
+    return m_torchLevel[camera_id];
 }
 
 /*===========================================================================
