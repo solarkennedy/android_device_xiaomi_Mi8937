@@ -8018,6 +8018,22 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     staticInfo.update(ANDROID_FLASH_INFO_AVAILABLE,
             &flashAvailable, 1);
 
+    /* Torch strength (Android 13+). The PMI8950 torch LED is current-driven and
+     * msm_flash_low() passes a per-source current straight through, so we can
+     * offer real levels rather than a single on/off step. Publishing a maximum
+     * level > 1 is what makes CameraManager expose
+     * turnOnTorchWithStrengthLevel() and SystemUI show the flashlight slider.
+     * The levels themselves live in QCameraFlash.h -- keep the two in sync.
+     * Only advertise this where there is actually a flash unit. */
+    if (flashAvailable == ANDROID_FLASH_INFO_AVAILABLE_TRUE) {
+        int32_t flashStrengthMaxLevel = QCAMERA_TORCH_LEVEL_MAX;
+        int32_t flashStrengthDefaultLevel = QCAMERA_TORCH_LEVEL_DEFAULT;
+        staticInfo.update(ANDROID_FLASH_INFO_STRENGTH_MAXIMUM_LEVEL,
+                &flashStrengthMaxLevel, 1);
+        staticInfo.update(ANDROID_FLASH_INFO_STRENGTH_DEFAULT_LEVEL,
+                &flashStrengthDefaultLevel, 1);
+    }
+
     Vector<uint8_t> avail_ae_modes;
     count = CAM_AE_MODE_MAX;
     count = MIN(gCamCapability[cameraId]->supported_ae_modes_cnt, count);
