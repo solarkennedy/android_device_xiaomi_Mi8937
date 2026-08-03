@@ -1,0 +1,20 @@
+# Intent Firewall rule storage, /data/system/ifw.
+#
+# Upstream this directory inherits system_data_file from /data/system, and
+# app.te carries an unconditional
+#   neverallow appdomain system_data_file:dir_file_class_set { create write ... }
+# so no app domain -- system_app included -- can be granted write access to it.
+# Blocker ships here as a platform-signed system-UID app and writes IFW rules
+# directly instead of shelling out to root, so the directory gets its own type.
+#
+# system_server (IntentFirewall) still creates the directory and reads/watches
+# the rules; the name-based transition below is what actually applies the label,
+# since file_contexts only takes effect on relabel, not on creation.
+type ifw_data_file, file_type, data_file_type, core_data_file_type;
+
+type_transition system_server system_data_file:dir ifw_data_file "ifw";
+allow system_server ifw_data_file:dir create_dir_perms;
+allow system_server ifw_data_file:file create_file_perms;
+
+allow system_app ifw_data_file:dir create_dir_perms;
+allow system_app ifw_data_file:file create_file_perms;

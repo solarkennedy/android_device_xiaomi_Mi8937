@@ -1,0 +1,27 @@
+// Blocker (com.merxury.blocker), Apache-2.0, https://github.com/lihenggui/blocker
+//
+// Built from a lightly patched source drop (~/Projects/blocker) rather than the
+// upstream release APK: the patch lets the app run in the system UID so
+// component control works with no root and no Shizuku. See PLAN-blocker.md.
+//
+// Re-signed with the platform key here -- that is what makes the manifest's
+// sharedUserId="android.uid.system" install, and what grants
+// CHANGE_COMPONENT_ENABLED_STATE. Deliberately NOT privileged: a plain
+// /system/app install picks up signature permissions without needing a
+// privapp-permissions allowlist entry.
+android_app_import {
+    name: "Blocker",
+    apk: "Blocker.apk",
+    certificate: "platform",
+    dex_preopt: {
+        enabled: false,
+    },
+
+    // Inherited from Compose (androidx.window). Both are declared
+    // required="false" in the APK but Soong still wants them acknowledged, and
+    // neither shared library is in this image.
+    optional_uses_libs: [
+        "androidx.window.extensions",
+        "androidx.window.sidecar",
+    ],
+}
