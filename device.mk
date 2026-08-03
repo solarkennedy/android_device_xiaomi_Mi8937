@@ -192,17 +192,14 @@ PRODUCT_VENDOR_PROPERTIES += \
     ro.keymaster.xxx.release=8.1.0 \
     ro.keymaster.xxx.security_patch=2020-09-01
 
-# Compressed hardware offload hard-fails on this ADSP: the DSP rejects
-# ASM_STREAM_CMD_OPEN_WRITE_V3 with ADSP_EFAILED, so any app that requests
-# offload (e.g. Twelve, which defaults enableOffload=true) sees AudioTrack
-# ERROR_DEAD_OBJECT and dies. Force all playback onto the working PCM path.
-# Verified live: setprop audio.offload.disable 1 + audioserver restart made
-# Twelve play the low-latency-playback usecase with no errors.
-# NOTE: this does NOT make the speaker audible on its own — pepito's speaker is
-# driven by an external NXP TFA9896 smart-amp that is not yet brought up in this
-# build (see PLAN-audio.md "External speaker amp (TFA9896)").
-PRODUCT_SYSTEM_PROPERTIES += \
-    audio.offload.disable=1
+# Compressed hardware offload: re-enabled 2026-08-03 (PLAN-hw-accel.md Lane C).
+# The 2026-07-06 hard-fail (DSP rejected ASM_STREAM_CMD_OPEN_WRITE_V3 with
+# ADSP_EFAILED, killing offload-requesting apps like Twelve with
+# ERROR_DEAD_OBJECT) no longer reproduces post-ACDB/audio landings: the
+# compress-offload-playback usecase opens, decodes, and advances cleanly on
+# the ADSP (bench-proven via direct offloaded AudioTrack MP3 stream, 0 DSP
+# errors, no SSR). If a regression ever resurfaces, restore
+# audio.offload.disable=1 here (PRODUCT_SYSTEM_PROPERTIES).
 
 # OTA: point the Updater app (packages/apps/Updater) at our own static feed
 # instead of a real LineageOS OTA server. Builds are hosted as GitHub Release
