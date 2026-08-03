@@ -76,7 +76,12 @@ ifeq ($(TARGET_DEVICE_PEPITO),true)
 # Source: packages/apps/OpenEUICC (upstream + two local fixes), prebuilt deps:
 # prebuilts/openeuicc-deps. Its Android.bp is platform-signed + privileged and pulls
 # in privapp_whitelist_im.angry.openeuicc.xml via `required`.
+# Blocker: per-component (activity/service/receiver/provider) app control. Patched
+# to run in the system UID so both its PM and Intent Firewall backends work with
+# no root and no Shizuku; /data/system/ifw is relabelled ifw_data_file for the
+# latter (sepolicy/system_ext/private). See PLAN-blocker.md.
 PRODUCT_PACKAGES += \
+    Blocker \
     OpenEUICC \
     PepitoLauncher2 \
     PepitoWallpapers \

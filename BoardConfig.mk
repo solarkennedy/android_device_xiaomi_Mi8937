@@ -128,6 +128,12 @@ BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/vendor
 BOARD_ODM_SEPOLICY_DIRS += $(DEVICE_PATH)/biometrics/sepolicy-odm
 BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/biometrics/sepolicy
 
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+# system_app/system_server rules for the Blocker Intent Firewall lane; core
+# domains, so this has to be system_ext policy rather than vendor/odm.
+SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/system_ext/private
+endif
+
 # Inherit from the proprietary version
 ifeq ($(PRODUCT_HARDWARE),Mi8917)
 include vendor/xiaomi/Mi8917/BoardConfigVendor.mk

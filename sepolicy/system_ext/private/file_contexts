@@ -1,0 +1,5 @@
+# Only takes effect on restorecon; new installs get the label from the
+# name-based type_transition in ifw_data_file.te. Present so that a dirty flash
+# onto an existing /data/system/ifw can be repaired with
+#   restorecon -R /data/system/ifw
+/data/system/ifw(/.*)?          u:object_r:ifw_data_file:s0
