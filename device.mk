@@ -87,6 +87,17 @@ PRODUCT_PACKAGES += \
 # Allowlist VolumeTile's signature|privileged STATUS_BAR permission (see the xml).
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/permissions/privapp-permissions-pepito.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/privapp-permissions-pepito.xml
+
+# Cold-start-critical apps that ship without ART profiles compile at build time
+# with the default speed-profile filter, which degrades to verify = pure JIT on
+# every cold start. Force full AOT for the two where launch latency matters:
+# the camera and the daily-driver launcher. (SystemUI/Trebuchet already get
+# this from AOSP's speed-apps list; the long tail is left to bg-dexopt, whose
+# usage-profile-guided speed-profile beats blanket speed. Blanket speed is
+# also ruled out by space: /system has ~170 MB free.)
+PRODUCT_DEXPREOPT_SPEED_APPS += \
+    Aperture \
+    PepitoLauncher2
 endif
 endif
 
