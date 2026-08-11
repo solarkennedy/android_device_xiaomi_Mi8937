@@ -51,6 +51,23 @@
         <value>1.5</value>
         <value>1.5</value>
     </array>
+    <!-- Modem controller coefficients (mA). Required for per-app mobile-radio
+         attribution: the A16 PowerStats pipeline prices ModemActivityInfo rx/tx
+         times with these; absent keys read as 0 mA and every UID gets 0.
+         qcrild reports RAT=UNKNOWN, which resolves to rat="DEFAULT".
+         Values are msm8937-class estimates, pending CT-3 calibration. -->
+    <modem>
+        <sleep>2</sleep>
+        <idle>45</idle>
+        <active rat="DEFAULT">
+            <receive>100</receive>
+            <transmit level="0">70</transmit>
+            <transmit level="1">120</transmit>
+            <transmit level="2">180</transmit>
+            <transmit level="3">260</transmit>
+            <transmit level="4">380</transmit>
+        </active>
+    </modem>
     <item name="battery.capacity">800</item>
     <item name="bluetooth.controller.voltage">3300</item>
 </device>
