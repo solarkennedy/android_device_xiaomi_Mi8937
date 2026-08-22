@@ -1,0 +1,7 @@
+# init.qmux.rc is a vendor rc, so vendor_init evaluates its `on property:` triggers
+# that start/stop the qmux_wfc_bridge VoWiFi feeder on persist.sys.pepito.wfc_enabled.
+# The prop is written by WfcBridge (platform_app) and is a system_restricted_prop,
+# which neverallows only non-coredomain SET, not READ — and vendor_init routinely
+# reads system props (many get_prop(vendor_init, ...) precedents). Without this,
+# vendor_init is denied reading the prop and the feeder never auto-starts.
+get_prop(vendor_init, pepito_wfc_prop)

@@ -97,6 +97,38 @@ service qmux_ims_enabler /vendor/bin/ims_enabler
     oneshot
     disabled
 
+# VoWiFi WLAN feeder: persistent daemon that polls wlan0 and, while associated,
+# feeds the modem DSD WLAN available (0x20) + measurement (0x3c) so it brings up
+# IWLAN / the ePDG tunnel for Wi-Fi calling (nothing else on our stack tells the
+# legacy modem Wi-Fi exists; see PLAN-vowifi.md part 41). QMI client on the
+# ipc_router via the force-ipcr DT_NEEDED; reads wlan0 over an inet socket
+# (wireless-extensions ioctls). Not oneshot — it tracks Wi-Fi state for the
+# life of the boot. Status prop vendor.qmux.wfc_bridge.
+service qmux_wfc_bridge /vendor/bin/wfc_wlan_bridge
+    class main
+    user radio
+    group radio inet log
+    disabled
+
+# VoWiFi ps_sys field-4 self-heal oneshot: arms the modem's per-PDN WLAN data
+# config (ps_sys_data_configurations.txt field 4 = 1) that a fresh unit needs
+# for the ePDG/reverse-rmnet tunnel to come up (PLAN-vowifi.md parts 44-47).
+# EFS write over DCI/EFS2 on /dev/diag (NOT QMI); parse-anchored, single-byte,
+# write-if-0, fail-safe — a no-op on an already-armed unit. Runs as root (needs
+# /dev/diag rw + the DCI ioctls). Gated on the user's WFC toggle like the feeder
+# below, so a unit whose owner never enables WFC never gets an EFS write. Status
+# prop vendor.qmux.wfc_efswrite = off|ok|applied|error.
+service qmux_wfc_efswrite /vendor/bin/wfc_efswrite
+    class main
+    user root
+    # vendor_qti_diag is the group that owns /dev/diag (crw-rw---- system
+    # vendor_qti_diag); joining it lets the DCI open pass the DAC group check
+    # WITHOUT CAP_DAC_OVERRIDE (which the wfc_efswrite domain deliberately does
+    # not get). See PLAN-vowifi.md part 47 flash #1.
+    group root vendor_qti_diag
+    oneshot
+    disabled
+
 # netmgrd (mobile data): programs the kernel rmnet_ipa data path over
 # WDS/WDA/IPA QMI. A QMI client -> carries the force-ipcr shim (DT_NEEDED);
 # the nightly netmgrd.rc is deliberately NOT shipped (it would free-run
@@ -134,6 +166,27 @@ on boot && property:ro.vendor.qmux.enable=1
     # VoLTE NV self-heal (oneshot; QCCI waits for the modem internally, and
     # ordering vs the IMS daemons is irrelevant — it only touches modem NV).
     start qmux_ims_enabler
+    # NOTE: qmux_wfc_bridge (the VoWiFi feeder) is NOT started here — it is
+    # gated on the user's Wi-Fi-calling toggle below, so it does not run (and
+    # burns no power feeding the modem) when WFC is off in Settings.
+
+# VoWiFi WLAN feeder start/stop, gated on the user's Wi-Fi-calling setting.
+# WfcBridge (a small platform app, ContentObserver on Settings wfc_ims_enabled)
+# mirrors the toggle into persist.sys.pepito.wfc_enabled; the value is persisted
+# so it is restored early on reboot (no bring-up latency vs the old boot start).
+# Started only when qmux is the active modem path AND WFC is on; stopped the
+# moment WFC is turned off. The daemon self-establishes IWLAN then idles
+# (see wfc_wlan_bridge.c).
+on property:persist.sys.pepito.wfc_enabled=1 && property:ro.vendor.qmux.enable=1
+    start qmux_wfc_bridge
+    # One-shot: arm ps_sys field 4 in modem EFS the first time WFC is enabled
+    # (no-op once armed). Runs alongside the feeder; the modem may only re-read
+    # this config at cold boot, so on a truly fresh unit the field is written
+    # here and takes effect on the next boot (WFC still zero-touch thereafter).
+    start qmux_wfc_efswrite
+
+on property:persist.sys.pepito.wfc_enabled=0
+    stop qmux_wfc_bridge
 
 # The nightly (QRTR) world for every other variant.
 on boot && property:ro.vendor.qmux.enable=0

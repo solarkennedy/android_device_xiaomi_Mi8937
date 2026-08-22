@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.lineageos.pepito.wfcbridge">
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Persistent so the ContentObserver stays registered for the life of the
+         boot; directBootAware so it runs (and the prop is kept in sync) before
+         first unlock. No runtime permissions needed: reading Settings.Global and
+         SystemProperties.set (platform_apis + sepolicy) require none. -->
+    <application
+        android:name=".WfcBridgeApp"
+        android:label="@string/app_name"
+        android:persistent="true"
+        android:directBootAware="true"
+        android:allowBackup="false">
+
+        <!-- Guarantees the process starts at boot even on a fresh flash (where
+             the mirror prop is still absent); the real work happens in the
+             Application's onCreate, which runs when the process is created to
+             deliver this. LOCKED_BOOT_COMPLETED fires in direct boot. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:directBootAware="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

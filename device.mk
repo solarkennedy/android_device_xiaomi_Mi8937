@@ -86,6 +86,7 @@ PRODUCT_PACKAGES += \
     PepitoLauncher2 \
     PepitoWallpapers \
     VolumeTile \
+    WfcBridge \
     xiaomi_pepito_overlay \
     xiaomi_pepito_overlay_systemui
 
@@ -213,6 +214,16 @@ PRODUCT_VENDOR_PROPERTIES += \
 # placeholders needed since the file already covers only this device.
 PRODUCT_SYSTEM_PROPERTIES += \
     lineage.updater.uri=https://raw.githubusercontent.com/solarkennedy/lineageos-pepito/lineageos23.2/pepito.json
+
+# Wi-Fi calling (PLAN-wifi-calling.md): the 2017 MPSS is modem-centric
+# ("legacy") IWLAN only — qcril must own the IWLAN RAT instead of deferring to
+# an AP-assisted data service. libril-qc-hal-qmi reads this prop to pick the
+# mode; the framework half is overlay-pepito emptying
+# config_wlan_data_service_package (see its comment). netmgrd's side
+# (persist.vendor.data.iwlan.enable + netmgr_config.xml iwlan_enable) already
+# ships enabled from mithorium-common.
+PRODUCT_SYSTEM_PROPERTIES += \
+    ro.telephony.iwlan_operation_mode=legacy
 endif
 
 # Face unlock — Phase 2: Paranoid Sense port (packages/apps/FaceUnlock, crDroid
@@ -372,8 +383,14 @@ PRODUCT_COPY_FILES += \
     device/xiaomi/Mi8937/qmux/qcrild.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/qcrild.rc
 
 # VoLTE NV self-heal oneshot (started by init.qmux.rc; see PLAN-volte.md)
+# + VoWiFi WLAN feeder (feeds the modem WLAN available/measurement over DSD so
+#   IWLAN/ePDG comes up for Wi-Fi calling; see PLAN-vowifi.md part 41)
+# + VoWiFi ps_sys field-4 EFS-write oneshot (toggle-gated; arms a fresh unit's
+#   modem for the ePDG tunnel; see PLAN-vowifi.md parts 44-47)
 PRODUCT_PACKAGES += \
-    ims_enabler
+    ims_enabler \
+    wfc_wlan_bridge \
+    wfc_efswrite
 # NOTE: libqmi_force_ipcr (the force-ipcr shim) is defined in mithorium-common
 # libshim/ and shipped via its gps_vendor_product.mk (the gnss service links
 # it; the qmux blobs carry it as a patched-in DT_NEEDED). Not duplicated here.

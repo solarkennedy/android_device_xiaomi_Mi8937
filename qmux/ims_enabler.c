@@ -159,21 +159,42 @@ struct setting {
 	unsigned int set_msg;
 	uint8_t      set_tlv;
 	uint8_t      want;
+	uint8_t      width;   /* 1 = u8 TLV; 4 = u32 TLV */
 };
+
+#define IMSS_GET_IMS_CONFIG  0x0054
+#define IMSS_SET_IMS_CONFIG  0x0053
 
 static const struct setting settings[] = {
 	/* IMS registration administratively on. THE gate: test_mode=1 ships
 	 * on stock/refurb EFS and turns IMS off (no SIP attempt at all). */
 	{ "reg_mgr.ims_test_mode", IMSS_GET_REG_MGR_CONFIG, 0x13,
-	                           IMSS_SET_REG_MGR_CONFIG, 0x12, 0 },
+	                           IMSS_SET_REG_MGR_CONFIG, 0x12, 0, 1 },
 	/* QIPCALL head bools (vt / mobile_data / volte, order per IDL);
 	 * bench DUT read 0,1,0 — all three must be 1 for FULL_SERVICE VoIP. */
 	{ "qipcall.bool0",         IMSS_GET_QIPCALL_CONFIG, 0x11,
-	                           IMSS_SET_QIPCALL_CONFIG, 0x10, 1 },
+	                           IMSS_SET_QIPCALL_CONFIG, 0x10, 1, 1 },
 	{ "qipcall.bool1",         IMSS_GET_QIPCALL_CONFIG, 0x12,
-	                           IMSS_SET_QIPCALL_CONFIG, 0x11, 1 },
+	                           IMSS_SET_QIPCALL_CONFIG, 0x11, 1, 1 },
 	{ "qipcall.bool2",         IMSS_GET_QIPCALL_CONFIG, 0x13,
-	                           IMSS_SET_QIPCALL_CONFIG, 0x12, 1 },
+	                           IMSS_SET_QIPCALL_CONFIG, 0x12, 1, 1 },
+	/* v01 WFC IWLAN preference (Blocker-A, PLAN-vowifi.md parts 34/40/44).
+	 * The framework's WFC-mode push is v02 0x6B, unimplemented on this 2017
+	 * modem, so only a v01 write flips it. 1 = IWLAN-preferred (opens
+	 * is_wlan_pref; the modem still keeps VoLTE on strong LTE — part 41).
+	 * SET 0x53 TLV 0x15 -> GET 0x54 TLV 0x16 (verified live). u32. Arms the
+	 * gate on fresh/EFS-default units so WFC works flash-and-go, not just on
+	 * the hand-provisioned DUT. */
+	{ "wfc.iwlan_pref",        IMSS_GET_IMS_CONFIG, 0x16,
+	                           IMSS_SET_IMS_CONFIG, 0x15, 1, 4 },
+	/* v01 WFC wifi_call value (PLAN-vowifi.md parts 29/45). Both proven-working
+	 * units (DUT + Gold) run 2; part 9 decoded wifi_call as wfc_status-1, so
+	 * 2 -> wfc_status=1 (ON). A fresh unit defaults to stock's 1 (wfc_status=0,
+	 * OFF) and every Gold attempt at 1 failed. Ship 2 to match the only
+	 * configurations ever seen working. SET 0x53 TLV 0x14 -> GET 0x54 TLV 0x15
+	 * (verified live). u32. */
+	{ "wfc.wifi_call",         IMSS_GET_IMS_CONFIG, 0x15,
+	                           IMSS_SET_IMS_CONFIG, 0x14, 2, 4 },
 };
 
 static int get_u8(qmi_client_type c, unsigned int msg, uint8_t tlv,
@@ -192,6 +213,70 @@ static int set_u8(qmi_client_type c, unsigned int msg, uint8_t tlv,
                   uint8_t val)
 {
 	uint8_t req[4] = { tlv, 1, 0, val };
+	uint8_t resp[2048];
+	unsigned int got = 0;
+	uint32_t result = 0xffffffff;
+	uint8_t dummy;
+	int rc = p_client_send_raw_msg_sync(c, msg, req, sizeof(req),
+	                                    resp, sizeof(resp), &got,
+	                                    QMI_TIMEOUT_MS);
+	if (rc) {
+		LOGE("SET 0x%04x tlv 0x%02x: send rc=%d", msg, tlv, rc);
+		return -1;
+	}
+	find_u8_tlv(resp, got, 0x00, &dummy, &result);
+	if ((result >> 16) != 0) {
+		LOGE("SET 0x%04x tlv 0x%02x: result=%u error=%u",
+		     msg, tlv, result >> 16, result & 0xffff);
+		return -1;
+	}
+	return 0;
+}
+
+/* u32 TLV variants for the WFC IWLAN-preference setting (0x53/0x54 TLVs are
+ * u32, unlike the u8 test_mode/qipcall bools). Little-endian. */
+static int find_u32_tlv(const uint8_t *buf, unsigned int len, uint8_t want_tlv,
+                        uint32_t *val, uint32_t *result)
+{
+	const uint8_t *p = buf, *end = buf + len;
+	int found = 0;
+
+	while (p + 3 <= end) {
+		uint8_t t = p[0];
+		uint16_t l = (uint16_t)(p[1] | (p[2] << 8));
+		const uint8_t *v = p + 3;
+
+		if (v + l > end)
+			break;
+		if (t == 0x02 && l >= 4 && result)
+			*result = ((uint32_t)(v[0] | (v[1] << 8)) << 16) |
+			          (uint32_t)(v[2] | (v[3] << 8));
+		if (t == want_tlv && l == 4) {
+			*val = (uint32_t)v[0] | ((uint32_t)v[1] << 8) |
+			       ((uint32_t)v[2] << 16) | ((uint32_t)v[3] << 24);
+			found = 1;
+		}
+		p = v + l;
+	}
+	return found;
+}
+
+static int get_u32(qmi_client_type c, unsigned int msg, uint8_t tlv,
+                   uint32_t *val)
+{
+	uint8_t resp[2048];
+	unsigned int got = 0;
+	if (p_client_send_raw_msg_sync(c, msg, NULL, 0, resp, sizeof(resp),
+	                               &got, QMI_TIMEOUT_MS))
+		return -1;
+	return find_u32_tlv(resp, got, tlv, val, NULL) ? 0 : -1;
+}
+
+static int set_u32(qmi_client_type c, unsigned int msg, uint8_t tlv,
+                   uint32_t val)
+{
+	uint8_t req[7] = { tlv, 4, 0, (uint8_t)val, (uint8_t)(val >> 8),
+	                   (uint8_t)(val >> 16), (uint8_t)(val >> 24) };
 	uint8_t resp[2048];
 	unsigned int got = 0;
 	uint32_t result = 0xffffffff;
@@ -238,6 +323,26 @@ static int pass(int *wrote)
 	for (size_t i = 0; i < sizeof(settings) / sizeof(settings[0]); i++) {
 		const struct setting *s = &settings[i];
 		uint8_t cur;
+
+		if (s->width == 4) {   /* u32 TLV (WFC IWLAN preference) */
+			uint32_t cur32;
+			if (get_u32(c, s->get_msg, s->get_tlv, &cur32) == 0 &&
+			    cur32 == s->want) {
+				LOGI("%s already %u", s->name, s->want);
+				continue;
+			}
+			if (set_u32(c, s->set_msg, s->set_tlv, s->want))
+				goto out;
+			(*wrote)++;
+			if (get_u32(c, s->get_msg, s->get_tlv, &cur32) ||
+			    cur32 != s->want) {
+				LOGE("%s: wrote %u but readback disagrees",
+				     s->name, s->want);
+				goto out;
+			}
+			LOGI("%s: set to %u (verified)", s->name, s->want);
+			continue;
+		}
 
 		if (get_u8(c, s->get_msg, s->get_tlv, &cur) == 0 &&
 		    cur == s->want) {

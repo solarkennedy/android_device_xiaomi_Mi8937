@@ -22,3 +22,35 @@ cc_binary {
     ],
     cflags: ["-Wall", "-Werror"],
 }
+
+// wfc_wlan_bridge — [qmux, VoWiFi productization] persistent daemon that polls
+// wlan0 and feeds the legacy modem DSD WLAN available (0x20) + measurement
+// (0x3c) reports so IWLAN / the ePDG tunnel come up for Wi-Fi calling. Same
+// QMI-over-ipc_router pattern as ims_enabler (dlopen libqmi_cci/libqmiservices,
+// ipc_router forced by linking libqmi_force_ipcr). See PLAN-vowifi.md part 41.
+cc_binary {
+    name: "wfc_wlan_bridge",
+    srcs: ["wfc_wlan_bridge.c"],
+    vendor: true,
+    shared_libs: [
+        "libqmi_force_ipcr",
+        "liblog",
+    ],
+    cflags: ["-Wall", "-Werror"],
+}
+
+// wfc_efswrite — [qmux, VoWiFi productization] toggle-gated modem-EFS write
+// that arms ps_sys "field 4" = 1 for Wi-Fi calling on a fresh unit. Transport
+// is DCI/EFS2 over /dev/diag (a minimal write-if-0 subset of
+// diag-tools/efs2-probe), NOT QMI — so no libqmi_force_ipcr. Started by init on
+// the user's WFC toggle; parse-anchored, single-byte, fail-safe. See
+// PLAN-vowifi.md parts 44-47.
+cc_binary {
+    name: "wfc_efswrite",
+    srcs: ["wfc_efswrite.c"],
+    vendor: true,
+    shared_libs: [
+        "liblog",
+    ],
+    cflags: ["-Wall", "-Werror"],
+}

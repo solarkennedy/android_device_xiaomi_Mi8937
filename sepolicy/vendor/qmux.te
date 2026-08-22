@@ -69,3 +69,44 @@ set_prop(ims_enabler, vendor_qmux_prop)
 # extract-files.py blob_fixups, linked into the source-built gnss service and
 # ims_enabler — and qmux_rmt_storage + its closure carry DT_RUNPATH
 # /vendor/lib64/qmux instead of LD_LIBRARY_PATH.
+
+# wfc_wlan_bridge — VoWiFi WLAN feeder (init.qmux.rc, PLAN-vowifi.md part 41).
+# A QMI client on the ipc_router (generic socket) exactly like ims_enabler,
+# PLUS it reads wlan0 over an AF_INET (udp) socket using wireless-extensions
+# ioctls (BSSID/SSID/freq) + SIOCGIFADDR (IPv4). Vendor-lib loading (dlopen of
+# libqmi_cci/libqmiservices) is covered by the global non-coredomain
+# vendor_file_type rules in system/sepolicy.
+type wfc_wlan_bridge, domain;
+type wfc_wlan_bridge_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(wfc_wlan_bridge)
+
+# ipc_router QMI (same pair as ims_enabler / rild): generic socket + the
+# IPC-router service-discovery ioctl allowlist, and the qmux gate props.
+allow wfc_wlan_bridge self:socket create_socket_perms;
+allowxperm wfc_wlan_bridge self:socket ioctl msm_sock_ipc_ioctls;
+get_prop(wfc_wlan_bridge, vendor_qmux_prop)
+set_prop(wfc_wlan_bridge, vendor_qmux_prop)
+
+# Read wlan0 on an inet/udp socket. GIW* + SIOCGIFADDR are read-only queries
+# (no CAP_NET_ADMIN); scope the ioctl xperm to exactly what read_wlan() issues.
+allow wfc_wlan_bridge self:udp_socket { create ioctl };
+# SIOCGIWAP/SIOCGIWESSID live in priv_sock_ioctls, SIOCGIFADDR/SIOCGIWFREQ in
+# unpriv_sock_ioctls — same grant legacy-um gives ims/netmgrd/location; the
+# priv_sock_ioctls neverallows are app/media/drm-scoped, not this vendor domain.
+allowxperm wfc_wlan_bridge self:udp_socket ioctl { unpriv_sock_ioctls priv_sock_ioctls };
+
+# wfc_efswrite — VoWiFi ps_sys field-4 self-heal oneshot (init.qmux.rc,
+# PLAN-vowifi.md parts 44-47). Unlike the QMI clients above it talks DCI/EFS2
+# directly on /dev/diag (no ipc_router socket, no force-ipcr). It opens
+# /dev/diag rw and issues the DCI register/deinit ioctls + EFS2 read/write — the
+# same diag access qmux_rmt_storage's A8 stack gets (rw_file_perms includes
+# ioctl; no allowxperm scoping on diag_device on this tree, per rmt_storage).
+type wfc_efswrite, domain;
+type wfc_efswrite_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(wfc_efswrite)
+
+allow wfc_efswrite diag_device:chr_file rw_file_perms;
+
+# Reads the qmux enable gate; reports its outcome in vendor.qmux.wfc_efswrite.
+get_prop(wfc_efswrite, vendor_qmux_prop)
+set_prop(wfc_efswrite, vendor_qmux_prop)

@@ -40,4 +40,28 @@
          0.0 matches the existing int minimum of 1. -->
     <item name="config_screenBrightnessSettingMinimumFloat" format="float" type="dimen">0.0</item>
     <item name="config_screenBrightnessSettingMaximumFloat" format="float" type="dimen">0.73</item>
+
+    <!-- Wi-Fi calling (PLAN-wifi-calling.md): pepito's 2017 MPSS only does
+         modem-centric ("legacy") IWLAN — the ePDG tunnel and IMS-over-WLAN run
+         inside the modem. mithorium-common's static overlay points these at
+         the AP-assisted vendor.qti.iwlan data service, which this modem cannot
+         use and which is not even packaged. Empty strings put
+         AccessNetworksManager in legacy mode (IMS APN stays on the cellular
+         transport; qcril reports RAT=IWLAN itself, selected by
+         ro.telephony.iwlan_operation_mode=legacy in device.mk). This lives in
+         the RRO, not overlay-pepito: mithorium's DEVICE_PACKAGE_OVERLAYS entry
+         wins the static merge, but a runtime RRO overrides it. -->
+    <string name="config_wlan_data_service_package" translatable="false"></string>
+    <string name="config_wlan_network_service_package" translatable="false"></string>
+    <string name="config_qualified_networks_service_package" translatable="false"></string>
+
+    <!-- Make the Wi-Fi calling toggle appear in Settings. AOSP defaults
+         config_device_wfc_ims_available to false, so ImsManager.isWfcEnabledByPlatform()
+         returns false and the toggle is hidden even though our CarrierConfig sets
+         carrier_wfc_ims_available_bool=true (PLAN-vowifi.md part 41). pepito does
+         WFC (the wfc_wlan_bridge feeder brings up IWLAN); scope this to pepito via
+         the RRO so siblings without WFC don't advertise it. (GBA is not required,
+         so isGbaValid() is true.) The GSI+volte-fix path masked this with the
+         persist.dbg.wfc_avail_ovr debug prop; this is the real fix. -->
+    <bool name="config_device_wfc_ims_available">true</bool>
 </resources>

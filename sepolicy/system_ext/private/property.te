@@ -1,0 +1,7 @@
+# persist.sys.pepito.wfc_enabled — mirror of the user's Wi-Fi-calling toggle,
+# written by WfcBridge (platform_app, see platform_app.te) and read by init to
+# start/stop the qmux_wfc_bridge VoWiFi feeder (init.qmux.rc). Declared
+# system_restricted_prop (system-owned, coredomain-set-only) following the qcom
+# vendor_wlc_prop precedent, so a coredomain app may set it while non-core
+# domains cannot.
+system_restricted_prop(pepito_wfc_prop)

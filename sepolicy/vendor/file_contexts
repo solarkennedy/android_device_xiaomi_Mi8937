@@ -19,6 +19,8 @@
 # rmt_storage domain; qcrild uses the existing rild domain (rild_exec label).
 /(vendor|system/vendor)/bin/qmux_rmt_storage	u:object_r:rmt_storage_exec:s0
 /(vendor|system/vendor)/bin/ims_enabler	u:object_r:ims_enabler_exec:s0
+/(vendor|system/vendor)/bin/wfc_wlan_bridge	u:object_r:wfc_wlan_bridge_exec:s0
+/(vendor|system/vendor)/bin/wfc_efswrite	u:object_r:wfc_efswrite_exec:s0
 
 # Palm stock sensor registry daemon (sensors.qcom shipped as sensors.qti) —
 # runs in the legacy-um 'sensors' domain, whose policy was written for this
