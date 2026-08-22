@@ -1,0 +1,3 @@
+# WfcBridge is platform-signed and runs in the platform_app domain; let it set
+# the WFC-enabled mirror prop that init uses to gate the VoWiFi feeder.
+set_prop(platform_app, pepito_wfc_prop)

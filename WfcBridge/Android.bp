@@ -1,0 +1,16 @@
+// WfcBridge — pepito-only platform app that mirrors the user's Wi-Fi-calling
+// toggle (Settings.Global wfc_ims_enabled) into persist.sys.pepito.wfc_enabled,
+// which init.qmux.rc uses to start/stop the qmux_wfc_bridge VoWiFi feeder so it
+// does not run (or burn power feeding the modem) when WFC is off. Persistent app,
+// no components: a ContentObserver in its Application does the mirroring.
+// platform_apis => access to android.os.SystemProperties; certificate:platform =>
+// runs in the platform_app domain (granted set_prop on the prop in sepolicy).
+android_app {
+    name: "WfcBridge",
+
+    srcs: ["src/**/*.java"],
+    resource_dirs: ["res"],
+    certificate: "platform",
+    platform_apis: true,
+    privileged: true,
+}
