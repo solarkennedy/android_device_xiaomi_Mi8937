@@ -18,7 +18,21 @@
  * stays LTE, r_rmnet DOWN). Feeding is only needed to ESTABLISH: once IWLAN is
  * up the modem self-maintains the ePDG tunnel with no further reports (proven
  * live 2026-08-21), so after priming the daemon backs off to a cheap wlan0 watch
- * and only re-primes on a disassociation/roam. Whether it runs at all is gated by
+ * and only re-primes on a disassociation/roam.
+ *
+ * The DOWN edge is just as load-bearing (memory nas-slow-reattach part 9,
+ * 2026-08-23): the modem holds WLAN-available indefinitely once reported, and
+ * a stale WLAN entry makes its IMS RegisterManager go IWLAN-first on every
+ * cold radio power-up — chasing a registration that cannot succeed for ~45 s
+ * before falling back to LTE = the ~50 s "Emergency calls only" wedge after
+ * any RF drop (bench A/B: cold re-attach 50 s stale vs 4 s cleared). So:
+ *   - on wlan0 disassociation the daemon sends DSD 0x21 WLAN_NOT_AVAILABLE;
+ *   - at startup it assumes possibly-stale state and clears it if wlan0 is
+ *     not associated (covers a previous boot/run having left it armed);
+ *   - "wfc_wlan_bridge down" runs the same clear as a oneshot, used by init
+ *     when the user turns WFC off (init stops the daemon, so its own down
+ *     edge can never fire) and at boot while WFC is off (see init.qmux.rc).
+ * Whether the daemon runs at all is gated by
  * init on the user's Wi-Fi-calling toggle (see init.qmux.rc + WfcBridge, which
  * mirrors the Settings toggle to persist.sys.pepito.wfc_enabled). The IWLAN->VoLTE
  * handover on good LTE is separate and *correct* (part 41) and is NOT handled here.
@@ -66,7 +80,9 @@
 
 #define DSD_SET_WIFI_RADIO_REQ 0x0034  /* TLV 0x13 = wifi radio switch */
 #define DSD_WLAN_AVAILABLE_REQ 0x0020
+#define DSD_WLAN_NOT_AVAILABLE_REQ 0x0021
 #define DSD_WLAN_MEAS_REQ      0x003c
+#define DOWN_RETRIES    40      /* "down" oneshot: wait up to ~2 min for DSD */
 #define WQE_PROFILE_ID         1       /* the armed WQE profile on pepito; 3/6 -> err 22 */
 #define REPORT_RSSI            (-50)   /* strong. Handover is NOT RSSI-driven (part 41); */
                                        /* a plausible good value keeps the modem from roving. */
@@ -267,6 +283,13 @@ static void send_wlan_available(const struct wlan_info *w)
 	dsd_send(DSD_WLAN_AVAILABLE_REQ, r, (unsigned)o);
 }
 
+/* WLAN_NOT_AVAILABLE carries no TLVs. Returns 0 only on QMI success, so the
+ * caller can retry on a transport error or modem-side failure. */
+static int send_wlan_unavailable(void)
+{
+	return dsd_send(DSD_WLAN_NOT_AVAILABLE_REQ, NULL, 0);
+}
+
 static void send_wlan_meas(const struct wlan_info *w, uint32_t seq)
 {
 	uint8_t r[160];
@@ -307,10 +330,13 @@ static void send_wlan_meas(const struct wlan_info *w, uint32_t seq)
 	dsd_send(DSD_WLAN_MEAS_REQ, r, (unsigned)o);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+	int down_mode = argc > 1 && strcmp(argv[1], "down") == 0;
+
 	if (!qmux_enabled()) {
-		__system_property_set(STATUS_PROP, "off");
+		if (!down_mode)
+			__system_property_set(STATUS_PROP, "off");
 		return 0;
 	}
 	if (resolve_syms()) {
@@ -328,6 +354,30 @@ int main(void)
 	}
 
 	char osbuf[512];
+
+	/* "down" oneshot: send a single WLAN_NOT_AVAILABLE and exit. Used by init
+	 * when the user turns WFC off (which stops the persistent daemon before
+	 * its down edge could run) and at boot while WFC is off, so no stale
+	 * WLAN-available entry survives to wedge cold IMS re-attach. QCCI may run
+	 * before the modem's DSD service exists at boot — retry briefly. */
+	if (down_mode) {
+		for (int t = 0; t < DOWN_RETRIES; t++) {
+			memset(osbuf, 0, sizeof(osbuf));
+			if (!p_init_instance(so, QMI_CLIENT_INSTANCE_ANY, ind_cb, NULL,
+			                     osbuf, QMI_TIMEOUT_MS, &g_c) && g_c) {
+				int rc = send_wlan_unavailable();
+				LOGI("down: WLAN_NOT_AVAILABLE rc=%d", rc);
+				p_release(g_c);
+				if (rc == 0)
+					return 0;
+				g_c = NULL;
+			}
+			sleep(FAST_SEC);
+		}
+		LOGE("down: DSD service never accepted the clear");
+		return 1;
+	}
+
 	uint32_t seq = 1;
 	const char *status = NULL;           /* current STATUS_PROP value */
 
@@ -335,6 +385,9 @@ int main(void)
 	int prime_left = 0;                  /* feed cycles remaining in this prime */
 	uint8_t cur_bssid[6] = { 0 };        /* BSSID we last primed for (0 = none) */
 	int up_elapsed = 0;                  /* seconds in ST_UP, for the re-prime timer */
+	int wlan_reported = 1;               /* modem may hold WLAN-available; starts 1 so
+	                                        a boot with Wi-Fi down clears stale state
+	                                        left by a previous boot/run */
 
 	for (;;) {
 		int nap = FAST_SEC;
@@ -359,6 +412,14 @@ int main(void)
 				LOGI("wlan0 not associated; idle");
 			state = ST_SEARCH;
 			memset(cur_bssid, 0, 6);
+			/* Down edge: the modem never ages WLAN-available out on its own,
+			 * and a stale entry sends cold IMS re-attach down the ~45 s
+			 * IWLAN-first path ("Emergency calls only" wedge). Clear it; keep
+			 * the flag on failure so the next poll retries. */
+			if (wlan_reported && send_wlan_unavailable() == 0) {
+				wlan_reported = 0;
+				LOGI("wlan0 down: sent WLAN_NOT_AVAILABLE");
+			}
 			set_status("searching", &status);
 			sleep(FAST_SEC);
 			continue;
@@ -369,6 +430,7 @@ int main(void)
 			memcpy(cur_bssid, w.bssid, 6);
 			state = ST_PRIME;
 			prime_left = PRIME_CYCLES;
+			wlan_reported = 1;
 			LOGI("priming modem: ssid=\"%s\" freq=%uMHz", w.ssid, w.freq_mhz);
 		}
 
