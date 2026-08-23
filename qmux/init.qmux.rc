@@ -110,6 +110,21 @@ service qmux_wfc_bridge /vendor/bin/wfc_wlan_bridge
     group radio inet log
     disabled
 
+# VoWiFi WLAN-down oneshot: the feeder binary in "down" mode — sends one DSD
+# WLAN_NOT_AVAILABLE so the modem drops WLAN from its available systems. The
+# modem never ages that state out on its own, and a stale entry makes IMS go
+# IWLAN-first on every cold radio power-up = the ~50 s "Emergency calls only"
+# wedge after RF drops (memory nas-slow-reattach part 9). Run when the user
+# turns WFC off — init stops the feeder, so its own down edge can never fire —
+# and at boot while WFC is off, clearing state a previous boot left armed.
+# Same exec/domain as the feeder (init_daemon_domain on wfc_wlan_bridge_exec).
+service qmux_wfc_down /vendor/bin/wfc_wlan_bridge down
+    class main
+    user radio
+    group radio inet log
+    oneshot
+    disabled
+
 # VoWiFi ps_sys field-4 self-heal oneshot: arms the modem's per-PDN WLAN data
 # config (ps_sys_data_configurations.txt field 4 = 1) that a fresh unit needs
 # for the ePDG/reverse-rmnet tunnel to come up (PLAN-vowifi.md parts 44-47).
@@ -187,6 +202,14 @@ on property:persist.sys.pepito.wfc_enabled=1 && property:ro.vendor.qmux.enable=1
 
 on property:persist.sys.pepito.wfc_enabled=0
     stop qmux_wfc_bridge
+
+# WFC just turned off (or booted off): clear any WLAN availability the feeder
+# (or a previous boot) left in the modem, so cold IMS re-attach stays on the
+# fast LTE path. A never-toggled unit leaves the persist prop unset, which
+# skips this — correct, since its feeder has never run either. The binary
+# self-gates on the qmux props like the feeder.
+on property:persist.sys.pepito.wfc_enabled=0 && property:ro.vendor.qmux.enable=1
+    start qmux_wfc_down
 
 # The nightly (QRTR) world for every other variant.
 on boot && property:ro.vendor.qmux.enable=0
