@@ -187,14 +187,16 @@ static const struct setting settings[] = {
 	 * the hand-provisioned DUT. */
 	{ "wfc.iwlan_pref",        IMSS_GET_IMS_CONFIG, 0x16,
 	                           IMSS_SET_IMS_CONFIG, 0x15, 1, 4 },
-	/* v01 WFC wifi_call value (PLAN-vowifi.md parts 29/45). Both proven-working
-	 * units (DUT + Gold) run 2; part 9 decoded wifi_call as wfc_status-1, so
-	 * 2 -> wfc_status=1 (ON). A fresh unit defaults to stock's 1 (wfc_status=0,
-	 * OFF) and every Gold attempt at 1 failed. Ship 2 to match the only
-	 * configurations ever seen working. SET 0x53 TLV 0x14 -> GET 0x54 TLV 0x15
-	 * (verified live). u32. */
+	/* v01 WFC wifi_call value (PLAN-vowifi.md parts 29/45/48). MUST be
+	 * stock's 1: with 2 the modem's IMS-over-IWLAN registration comes up
+	 * SMS-only (IMSA voip_service_status=NO_SERVICE) — MO calls are refused
+	 * by the framework and MT calls go to voicemail. Proven live on both
+	 * units 2026-08-23; writing 1 brought voip_service_status to
+	 * FULL_SERVICE in ~40 s and a real Wi-Fi call connected (RTP verified).
+	 * The part-45 "2 works" note predates any voice testing (SMS-only bar).
+	 * SET 0x53 TLV 0x14 -> GET 0x54 TLV 0x15 (verified live). u32. */
 	{ "wfc.wifi_call",         IMSS_GET_IMS_CONFIG, 0x15,
-	                           IMSS_SET_IMS_CONFIG, 0x14, 2, 4 },
+	                           IMSS_SET_IMS_CONFIG, 0x14, 1, 4 },
 };
 
 static int get_u8(qmi_client_type c, unsigned int msg, uint8_t tlv,
