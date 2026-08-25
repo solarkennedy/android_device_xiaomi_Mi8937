@@ -85,11 +85,14 @@ service vendor.ims_rtp_daemon /vendor/bin/ims_rtp_daemon
     group radio vendor_qti_diag inet log
     disabled
 
-# VoLTE self-heal oneshot: asserts modem NV ims_test_mode=0 + qipcall bools
-# over v01 IMSS QMI (the A15 qcril ims module is v02-only and cannot). NV
-# persists in modem EFS, so the steady-state run is read-only (status prop
-# vendor.qmux.ims_enabler = ok); a fresh/refurb/EFS-wiped unit gets the
-# writes re-applied (= applied). Retries internally until the modem is up.
+# VoLTE/VoWiFi self-heal oneshot: asserts modem NV ims_test_mode=0 + qipcall
+# bools + the IWLAN gate over v01 IMSS QMI (the A15 qcril ims module is
+# v02-only and cannot), then makes sure the IMS MSISDN is provisioned (learned
+# from the LTE registration URI; VoWiFi voice is SMS-only without it). NV
+# persists in modem EFS, so the steady-state run is read-only (status props
+# vendor.qmux.ims_enabler = ok, vendor.qmux.ims_msisdn = kept); a fresh unit
+# gets the writes applied (= applied / set). Started at boot and again on
+# gsm.sim.state=LOADED (see below). Retries internally until the modem is up.
 service qmux_ims_enabler /vendor/bin/ims_enabler
     class main
     user radio
@@ -199,6 +202,18 @@ on property:persist.sys.pepito.wfc_enabled=1 && property:ro.vendor.qmux.enable=1
     # this config at cold boot, so on a truly fresh unit the field is written
     # here and takes effect on the next boot (WFC still zero-touch thereafter).
     start qmux_wfc_efswrite
+
+# Re-run the IMS NV self-heal whenever a SIM finishes loading. The modem keeps
+# the IMSS store per subscription: on a virgin unit the SIM-less boot-time
+# writes (IWLAN gate, qipcall bools) land only in the no-SIM context and are
+# gone once the SIM loads; a write made with the SIM loaded persists in EFS
+# (PLAN-vowifi.md parts 49/51). This is also the earliest moment the MSISDN
+# (VoWiFi voice gate, part 52) can be learned from the LTE IMS registration.
+# The oneshot is idempotent (read-compare-write), so a provisioned unit pays
+# a few read-only GETs. If the boot instance is still running, init ignores
+# this start and that instance re-asserts on its own once IMS registers.
+on property:gsm.sim.state=LOADED && property:ro.vendor.qmux.enable=1
+    start qmux_ims_enabler
 
 on property:persist.sys.pepito.wfc_enabled=0
     stop qmux_wfc_bridge
