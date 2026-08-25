@@ -24,8 +24,29 @@
  * QRTR probe fails and QCCI uses its native ipc_router backend, same as
  * every other qmux QMI client. Self-gates on the qmux enable props.
  *
+ * Second phase (PLAN-vowifi.md parts 49-52, 2026-08-24): the IMS MSISDN.
+ * The modem refuses VoWiFi *voice* (IMSA voip_service_status=NO_SERVICE over
+ * WLAN, SMS still fine) unless IMSS GET 0x54 TLV 0x19 holds the line's
+ * MSISDN. Bench units had it cached from stock-era provisioning; a virgin
+ * unit has it empty and Wi-Fi calling silently comes up SMS-only. Nothing on
+ * the AP side writes it on this ROM (no entitlement app; the qcril ims module
+ * is v02-only). The number is learnable from the modem itself: once IMS has
+ * registered on LTE, IMSA GET_REGISTRATION_STATUS (0x20) TLV 0x15 carries the
+ * P-Associated-URI list incl. "tel:+1XXXXXXXXXX". We copy the digits into
+ * IMSS SET 0x53 TLV 0x18 (stock's encoding: ASCII, no '+', no NUL). Verified
+ * live 2026-08-24: one such write -> voice FULL_SERVICE over WLAN in 10 s and
+ * a real Wi-Fi call; persists in EFS across reboots.
+ *
+ * Why the SIM-loaded re-run (init.qmux.rc): the IMSS store is kept per
+ * subscription. A write done SIM-less at boot on a virgin unit lands only in
+ * the no-SIM context and is gone once the SIM loads (parts 49/51); a write
+ * with the SIM loaded persists. So init re-starts this oneshot on
+ * gsm.sim.state=LOADED, and a still-running boot instance re-asserts the
+ * settings once it sees IMS registered (SIM necessarily in by then).
+ *
  * Observable: sets vendor.qmux.ims_enabler = ok | applied | failed | off
- * and logs to logcat (tag ims_enabler).
+ * and vendor.qmux.ims_msisdn = kept | set | pending | failed, and logs to
+ * logcat (tag ims_enabler).
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -43,14 +64,23 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 #define STATUS_PROP     "vendor.qmux.ims_enabler"
+#define MSISDN_PROP     "vendor.qmux.ims_msisdn"
 #define QMI_TIMEOUT_MS  10000
 #define TOTAL_BUDGET_S  150   /* covers modem PIL boot + the early rmts blip SSR */
+#define MSISDN_BUDGET_S 180   /* SIM load + LTE IMS registration after boot/insert */
 #define RETRY_SLEEP_S   5
+#define MSISDN_MAX      32
 
 #define IMSS_SET_REG_MGR_CONFIG  0x0021
 #define IMSS_GET_REG_MGR_CONFIG  0x0026
 #define IMSS_SET_QIPCALL_CONFIG  0x0036
 #define IMSS_GET_QIPCALL_CONFIG  0x0037
+#define IMSS_GET_IMS_CONFIG      0x0054
+#define IMSS_SET_IMS_CONFIG      0x0053
+#define IMSS_MSISDN_GET_TLV      0x19   /* GET 0x54: ASCII digits, len 0 = unset */
+#define IMSS_MSISDN_SET_TLV      0x18   /* SET 0x53: same encoding */
+#define IMSA_GET_REGISTRATION_STATUS 0x0020
+#define IMSA_URI_LIST_TLV        0x15   /* u8 count, then [u8 len][bytes]... */
 
 #define QMI_CLIENT_INSTANCE_ANY  0xffff
 
@@ -72,6 +102,7 @@ static int (*p_client_send_raw_msg_sync)(qmi_client_type, unsigned int,
                                          unsigned int *, unsigned int);
 static int (*p_client_release)(qmi_client_type);
 static qmi_idl_service_object_type (*p_imss_get_service_object)(int, int, int);
+static qmi_idl_service_object_type (*p_imsa_get_service_object)(int, int, int);
 
 static void ind_cb(qmi_client_type h, unsigned int msg_id, void *buf,
                    unsigned int len, void *cbd)
@@ -114,9 +145,12 @@ static int resolve_symbols(void)
 	                   dlsym(cci, "qmi_client_release");
 	p_imss_get_service_object = (qmi_idl_service_object_type (*)(int, int, int))
 	                            dlsym(svc, "imss_get_service_object_internal_v01");
+	p_imsa_get_service_object = (qmi_idl_service_object_type (*)(int, int, int))
+	                            dlsym(svc, "imsa_get_service_object_internal_v01");
 
 	if (!p_client_init_instance || !p_client_send_raw_msg_sync ||
-	    !p_client_release || !p_imss_get_service_object) {
+	    !p_client_release || !p_imss_get_service_object ||
+	    !p_imsa_get_service_object) {
 		LOGE("dlsym failed: %s", dlerror());
 		return -1;
 	}
@@ -161,9 +195,6 @@ struct setting {
 	uint8_t      want;
 	uint8_t      width;   /* 1 = u8 TLV; 4 = u32 TLV */
 };
-
-#define IMSS_GET_IMS_CONFIG  0x0054
-#define IMSS_SET_IMS_CONFIG  0x0053
 
 static const struct setting settings[] = {
 	/* IMS registration administratively on. THE gate: test_mode=1 ships
@@ -299,6 +330,165 @@ static int set_u32(qmi_client_type c, unsigned int msg, uint8_t tlv,
 	return 0;
 }
 
+
+/* Generic TLV lookup (any length). Returns pointer to the value bytes and
+ * its length, or NULL. Also parses the 0x02 result TLV if `result` given. */
+static const uint8_t *find_tlv(const uint8_t *buf, unsigned int len,
+                               uint8_t want_tlv, uint16_t *vlen,
+                               uint32_t *result)
+{
+	const uint8_t *p = buf, *end = buf + len, *hit = NULL;
+
+	while (p + 3 <= end) {
+		uint8_t t = p[0];
+		uint16_t l = (uint16_t)(p[1] | (p[2] << 8));
+		const uint8_t *v = p + 3;
+
+		if (v + l > end)
+			break;
+		if (t == 0x02 && l >= 4 && result)
+			*result = ((uint32_t)(v[0] | (v[1] << 8)) << 16) |
+			          (uint32_t)(v[2] | (v[3] << 8));
+		if (t == want_tlv) {
+			hit = v;
+			*vlen = l;
+		}
+		p = v + l;
+	}
+	return hit;
+}
+
+/* Connect a QCCI client to a v01 service object found via a getter that
+ * needs the blob's exact IDL minor (probe 0..300, same as the diag probes). */
+static qmi_client_type connect_svc(qmi_idl_service_object_type (*getter)(int, int, int),
+                                   const char *name)
+{
+	qmi_idl_service_object_type so = NULL;
+	qmi_client_type c = NULL;
+	char osbuf[512];
+
+	for (int m = 0; m <= 300 && !so; m++)
+		so = getter(1, m, 6);
+	if (!so) {
+		LOGE("no %s service object", name);
+		return NULL;
+	}
+	memset(osbuf, 0, sizeof(osbuf));
+	if (p_client_init_instance(so, QMI_CLIENT_INSTANCE_ANY, ind_cb, NULL,
+	                           osbuf, QMI_TIMEOUT_MS, &c) || !c) {
+		LOGI("%s not up yet (init_instance failed)", name);
+		return NULL;
+	}
+	return c;
+}
+
+/* IMSS GET 0x54 TLV 0x19 -> ASCII MSISDN. Returns 0 with out[] filled (may
+ * be empty string = unset), -1 on transport failure. */
+static int get_msisdn(qmi_client_type c, char *out, size_t outsz)
+{
+	uint8_t resp[2048];
+	unsigned int got = 0;
+	uint16_t vlen = 0;
+	const uint8_t *v;
+
+	if (p_client_send_raw_msg_sync(c, IMSS_GET_IMS_CONFIG, NULL, 0, resp,
+	                               sizeof(resp), &got, QMI_TIMEOUT_MS))
+		return -1;
+	v = find_tlv(resp, got, IMSS_MSISDN_GET_TLV, &vlen, NULL);
+	out[0] = '\0';
+	if (!v || vlen == 0)
+		return 0;
+	if (vlen >= outsz)
+		vlen = (uint16_t)(outsz - 1);
+	memcpy(out, v, vlen);
+	out[vlen] = '\0';
+	return 0;
+}
+
+/* IMSS SET 0x53 TLV 0x18 = ASCII digits, no NUL (stock encoding). */
+static int set_msisdn(qmi_client_type c, const char *digits)
+{
+	uint8_t req[3 + MSISDN_MAX];
+	uint8_t resp[2048];
+	unsigned int got = 0;
+	uint32_t result = 0xffffffff;
+	uint16_t dummy;
+	size_t n = strlen(digits);
+	int rc;
+
+	if (n == 0 || n > MSISDN_MAX)
+		return -1;
+	req[0] = IMSS_MSISDN_SET_TLV;
+	req[1] = (uint8_t)n;
+	req[2] = (uint8_t)(n >> 8);
+	memcpy(req + 3, digits, n);
+	rc = p_client_send_raw_msg_sync(c, IMSS_SET_IMS_CONFIG, req,
+	                                (unsigned int)(3 + n), resp, sizeof(resp),
+	                                &got, QMI_TIMEOUT_MS);
+	if (rc) {
+		LOGE("SET msisdn: send rc=%d", rc);
+		return -1;
+	}
+	find_tlv(resp, got, 0x00, &dummy, &result);
+	if ((result >> 16) != 0) {
+		LOGE("SET msisdn: result=%u error=%u", result >> 16,
+		     result & 0xffff);
+		return -1;
+	}
+	return 0;
+}
+
+/* Ask IMSA for the registration URI list and pull the digits out of the
+ * tel: entry. Returns 1 = digits filled, 0 = not registered / no tel URI yet,
+ * -1 = IMSA unreachable. */
+static int imsa_tel_digits(char *out, size_t outsz)
+{
+	qmi_client_type c = connect_svc(p_imsa_get_service_object, "IMSA");
+	uint8_t resp[2048];
+	unsigned int got = 0;
+	uint16_t vlen = 0;
+	const uint8_t *v, *p, *end;
+	unsigned int count;
+	int rc = 0;
+
+	if (!c)
+		return -1;
+	if (p_client_send_raw_msg_sync(c, IMSA_GET_REGISTRATION_STATUS, NULL, 0,
+	                               resp, sizeof(resp), &got, QMI_TIMEOUT_MS)) {
+		p_client_release(c);
+		return -1;
+	}
+	p_client_release(c);
+
+	v = find_tlv(resp, got, IMSA_URI_LIST_TLV, &vlen, NULL);
+	if (!v || vlen < 2)
+		return 0;
+	count = v[0];
+	p = v + 1;
+	end = v + vlen;
+	for (unsigned int i = 0; i < count && p < end; i++) {
+		unsigned int l = p[0];
+		const uint8_t *str = p + 1;
+
+		if (str + l > end)
+			break;
+		if (l > 4 && memcmp(str, "tel:", 4) == 0) {
+			size_t o = 0;
+
+			for (unsigned int k = 4; k < l && o + 1 < outsz; k++)
+				if (str[k] >= '0' && str[k] <= '9')
+					out[o++] = (char)str[k];
+			out[o] = '\0';
+			if (o >= 7) {   /* sanity: a real subscriber number */
+				rc = 1;
+				break;
+			}
+		}
+		p = str + l;
+	}
+	return rc;
+}
+
 /* One full pass: connect, assert every setting, verify by re-read.
  * Returns 0 = all verified at desired values; fills *wrote. */
 static int pass(int *wrote)
@@ -367,6 +557,63 @@ out:
 	return rc;
 }
 
+/* Phase 2: make sure the modem holds the line's MSISDN (VoWiFi voice gate).
+ * Fast path (every provisioned unit): one GET, "kept". Slow path (virgin
+ * unit): wait for IMS to register on LTE, learn the number from the
+ * registration URI, re-assert the settings table (the SIM is in now, so the
+ * writes land in the per-subscription store), then write + verify.
+ * Never fails the boot: "pending" just means no SIM/registration inside the
+ * budget — the SIM-loaded trigger runs us again later. */
+static void msisdn_phase(void)
+{
+	time_t deadline = time(NULL) + MSISDN_BUDGET_S;
+	char cur[MSISDN_MAX + 1], want[MSISDN_MAX + 1];
+	int wrote = 0;
+
+	__system_property_set(MSISDN_PROP, "pending");
+	for (;;) {
+		qmi_client_type c = connect_svc(p_imss_get_service_object, "IMSS");
+
+		if (c && get_msisdn(c, cur, sizeof(cur)) == 0 && cur[0]) {
+			LOGI("msisdn already set (%zu digits)", strlen(cur));
+			p_client_release(c);
+			__system_property_set(MSISDN_PROP, "kept");
+			return;
+		}
+		if (c)
+			p_client_release(c);
+
+		if (imsa_tel_digits(want, sizeof(want)) == 1) {
+			/* SIM is in and IMS registered: re-assert the table so
+			 * the per-subscription store gets the gate too. */
+			if (pass(&wrote) == 0 && wrote)
+				LOGI("re-asserted settings with SIM loaded (%d writes)", wrote);
+			c = connect_svc(p_imss_get_service_object, "IMSS");
+			if (c && set_msisdn(c, want) == 0 &&
+			    get_msisdn(c, cur, sizeof(cur)) == 0 &&
+			    strcmp(cur, want) == 0) {
+				LOGI("msisdn: set from registration URI (%zu digits, verified)",
+				     strlen(want));
+				p_client_release(c);
+				__system_property_set(MSISDN_PROP, "set");
+				return;
+			}
+			if (c)
+				p_client_release(c);
+			LOGE("msisdn: write/readback failed");
+			__system_property_set(MSISDN_PROP, "failed");
+			return;
+		}
+
+		if (time(NULL) >= deadline) {
+			LOGI("msisdn: no IMS registration within %ds, leaving pending",
+			     MSISDN_BUDGET_S);
+			return;
+		}
+		sleep(RETRY_SLEEP_S);
+	}
+}
+
 int main(void)
 {
 	time_t deadline = time(NULL) + TOTAL_BUDGET_S;
@@ -390,7 +637,7 @@ int main(void)
 			     wrote ? "applied" : "already ok", wrote);
 			__system_property_set(STATUS_PROP,
 			                      wrote ? "applied" : "ok");
-			return 0;
+			break;
 		}
 		if (time(NULL) >= deadline) {
 			LOGE("giving up after %ds", TOTAL_BUDGET_S);
@@ -399,4 +646,7 @@ int main(void)
 		}
 		sleep(RETRY_SLEEP_S);
 	}
+
+	msisdn_phase();
+	return 0;
 }
