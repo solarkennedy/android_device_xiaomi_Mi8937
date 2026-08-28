@@ -70,6 +70,17 @@ on property:ro.vendor.xiaomi.series=ulysse
 on property:ro.vendor.xiaomi.series=wt8917
     setprop ro.hardware.camera wingtech
 
+# Remote debugging: keep adbd rooted across reboots on an opted-in unit (Gold,
+# the daily driver). adbd only consults service.adb.root at its own startup and
+# the Settings "Rooted debugging" toggle does not persist that prop, so every
+# reboot drops adbd back to uid 2000 until someone runs `adb root` — awkward
+# when the phone is on the road. Opt in per unit from a rooted shell:
+#     setprop persist.vendor.xiaomi.adbroot 1        (0 to revert)
+# Fires when persist props load (post-fs-data), i.e. before `on boot` starts
+# adbd. Note: while set, this bypasses the Settings toggle.
+on property:ro.vendor.xiaomi.device=pepito && property:persist.vendor.xiaomi.adbroot=1
+    setprop service.adb.root 1
+
 # Fingerprint
 service vendor.goodix_script /vendor/bin/init.goodix.sh
     class late_start
