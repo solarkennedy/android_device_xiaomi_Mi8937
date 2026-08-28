@@ -23,4 +23,10 @@ $(call inherit-product, vendor/pepito-gapps/gapps.mk)
 PRODUCT_COPY_FILES += \
     device/xiaomi/Mi8937/permissions/default-permissions-google-search.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/default-permissions/default-permissions-google-search.xml
 
+# GApps-only framework overlay: points the on-device speech recognizer at
+# Speech Services by Google so the Speech settings page exposes the offline
+# language-pack screen (see overlay-gapps/.../config.xml for the full why).
+DEVICE_PACKAGE_OVERLAYS += \
+    device/xiaomi/Mi8937/overlay-gapps
+
 PRODUCT_NAME := lineage_Mi8937_gapps
