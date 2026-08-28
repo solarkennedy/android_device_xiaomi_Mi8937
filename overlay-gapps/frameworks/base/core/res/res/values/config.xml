@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2026 The LineageOS Project
+
+     SPDX-License-Identifier: Apache-2.0
+-->
+<!-- GApps-only framework overlay (see lineage_Mi8937_gapps.mk). -->
+<resources>
+    <!-- Default on-device speech recognizer: the RecognitionService inside
+         "Speech Recognition and Synthesis from Google" (com.google.android.tts,
+         shipped by the NikGapps payload). Same value Pixel ships. With it:
+           * Settings > System > Languages > Speech gains the AOSP "On-device
+             recognition settings" row, which opens the app's declared
+             settingsActivity (offline language-pack download screen). Without
+             it that screen is unreachable from any menu, because AOSP's other
+             route ("Voice input") is hidden whenever ro.config.low_ram=true
+             drops the notLowRam android.software.voice_recognizers feature
+             (GoTweaks low_ram toggle).
+           * SpeechRecognizer.isOnDeviceRecognitionAvailable() becomes true,
+             so apps can use the on-device (offline) recognizer.
+         Must NOT be set on the vanilla product: the package does not exist
+         there and Settings would log a missing-recognizer error. -->
+    <string name="config_defaultOnDeviceSpeechRecognitionService" translatable="false">com.google.android.tts/com.google.android.apps.speech.tts.googletts.service.GoogleTTSRecognitionService</string>
+
+    <!-- Default speech recognizer PACKAGE name (not a component; see
+         VoiceInteractionManagerService.findAvailRecognizer(), which compares this
+         value against ServiceInfo.packageName). Without it, the secure setting
+         voice_recognition_service is never populated on pepito: findAvailRecognizer()'s
+         fallback loop only accepts a recognizer carrying FLAG_SYSTEM, and nothing in
+         the ROM (vanilla or gapps) ships a RecognitionService at all. The prefPackage
+         match that runs ahead of that fallback has no system-app requirement, so
+         naming the package here is what lets the Play-installed "Speech Recognition
+         and Synthesis from Google" (com.google.android.tts, in /data/app) be picked
+         as the default recognizer.
+
+         Two things this deliberately does NOT do:
+           * It does not grant the SYSTEM_SPEECH_RECOGNIZER role. That role is
+             systemOnly="true" (PermissionController roles.xml) and
+             Role.isPackageMinimallyQualifiedAsUser() rejects any package without
+             FLAG_SYSTEM, so a /data-installed payload can never hold it. The role's
+             RECORD_AUDIO and UPDATE_APP_OPS_STATS pregrants therefore do not happen.
+           * It is not defeated by the GoTweaks low_ram toggle. mEnableService gates
+             the voice *interactor* (assistant), not the recognizer; initRecognizer()
+             runs unconditionally at the end of initForUserNoTracing().
+
+         Must NOT be set on the vanilla product: the package does not exist there. -->
+    <string name="config_systemSpeechRecognizer" translatable="false">com.google.android.tts</string>
+</resources>
