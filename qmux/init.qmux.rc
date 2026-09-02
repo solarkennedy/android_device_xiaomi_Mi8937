@@ -91,8 +91,9 @@ service vendor.ims_rtp_daemon /vendor/bin/ims_rtp_daemon
 # from the LTE registration URI; VoWiFi voice is SMS-only without it). NV
 # persists in modem EFS, so the steady-state run is read-only (status props
 # vendor.qmux.ims_enabler = ok, vendor.qmux.ims_msisdn = kept); a fresh unit
-# gets the writes applied (= applied / set). Started at boot and again on
-# gsm.sim.state=LOADED (see below). Retries internally until the modem is up.
+# gets the writes applied (= applied / set). Started at boot and again when the
+# user turns Wi-Fi calling on (see below — a gsm.sim.state trigger is impossible
+# from a vendor rc). Retries internally until the modem is up.
 service qmux_ims_enabler /vendor/bin/ims_enabler
     class main
     user radio
@@ -202,18 +203,24 @@ on property:persist.sys.pepito.wfc_enabled=1 && property:ro.vendor.qmux.enable=1
     # this config at cold boot, so on a truly fresh unit the field is written
     # here and takes effect on the next boot (WFC still zero-touch thereafter).
     start qmux_wfc_efswrite
-
-# Re-run the IMS NV self-heal whenever a SIM finishes loading. The modem keeps
-# the IMSS store per subscription: on a virgin unit the SIM-less boot-time
-# writes (IWLAN gate, qipcall bools) land only in the no-SIM context and are
-# gone once the SIM loads; a write made with the SIM loaded persists in EFS
-# (PLAN-vowifi.md parts 49/51). This is also the earliest moment the MSISDN
-# (VoWiFi voice gate, part 52) can be learned from the LTE IMS registration.
-# The oneshot is idempotent (read-compare-write), so a provisioned unit pays
-# a few read-only GETs. If the boot instance is still running, init ignores
-# this start and that instance re-asserts on its own once IMS registers.
-on property:gsm.sim.state=LOADED && property:ro.vendor.qmux.enable=1
+    # Also re-run the IMS NV self-heal here. This is the SIM-loaded re-run that
+    # the (removed) gsm.sim.state trigger below was meant to be: by the time the
+    # user turns WFC on, the SIM is in and IMS is registered on LTE, so the
+    # enabler can learn the MSISDN from the registration URI and its writes land
+    # in the per-subscription store. Idempotent, so a provisioned unit pays only
+    # a few read-only GETs.
     start qmux_ims_enabler
+
+# ⚠️ DO NOT re-add `on property:gsm.sim.state=LOADED` here. This is a VENDOR rc,
+# so its triggers are evaluated by vendor_init, which is FORBIDDEN from reading
+# the platform radio_prop type — the trigger was silently dead code:
+#   avc: denied { read } for property=gsm.sim.state scontext=u:r:vendor_init:s0
+#        tcontext=u:object_r:radio_prop:s0 tclass=file
+# (verified on 9c2e6b00 2026-09-01: toggling the prop NOT_READY->LOADED produced
+# no init start at all). Granting it is impossible, not merely unwired:
+# `get_prop(vendor_init, radio_prop)` FAILS the build's neverallow check —
+# system/sepolicy/private/property.te:291 forbids vendor domains reading
+# radio_prop. The SIM-loaded re-run therefore rides the WFC-on trigger above.
 
 on property:persist.sys.pepito.wfc_enabled=0
     stop qmux_wfc_bridge
