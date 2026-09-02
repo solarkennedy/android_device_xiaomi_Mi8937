@@ -70,6 +70,7 @@
 #define MSISDN_BUDGET_S 180   /* SIM load + LTE IMS registration after boot/insert */
 #define RETRY_SLEEP_S   5
 #define MSISDN_MAX      32
+#define MSISDN_MIN_DIGITS 7   /* shortest plausible subscriber number */
 
 #define IMSS_SET_REG_MGR_CONFIG  0x0021
 #define IMSS_GET_REG_MGR_CONFIG  0x0026
@@ -382,6 +383,50 @@ static qmi_client_type connect_svc(qmi_idl_service_object_type (*getter)(int, in
 	return c;
 }
 
+/* Monotonic seconds for timeouts.
+ *
+ * ⚠️ NEVER use time(NULL) for a deadline here. This board's PMIC RTC is not
+ * battery-backed: the kernel sets the clock to 1970-01-01 at every cold boot
+ * ("rtc-pm8xxx: setting system clock to 1970-01-01 00:00:44 UTC"), and network
+ * time sync then jumps it forward by ~56 years while we are running. Any
+ * wall-clock deadline is instantly in the past, so the retry loops give up
+ * immediately. Measured on 9c2e6b00 2026-09-01: the boot instance exited after
+ * 12.4 s instead of honouring MSISDN_BUDGET_S=180, leaving ims_msisdn=pending
+ * on a virgin unit — i.e. exactly the flash-and-go path this service exists for. */
+static time_t now_mono(void)
+{
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &ts))
+		return 0;   /* cannot fail in practice; 0 just retries once more */
+	return ts.tv_sec;
+}
+
+/* Is what the modem holds an actual subscriber number?
+ *
+ * ⚠️ A VIRGIN MODEM SHIPS TLV 0x19 = ASCII "0" (one byte), not an empty TLV.
+ * Testing only for non-emptiness therefore reports "already provisioned" on
+ * exactly the fresh units this code exists to fix, and VoWiFi voice stays on
+ * WWAN forever (the modem gates VoWiFi voice, not SMS, on a real MSISDN).
+ * Observed on 7600e051, 2026-08-31: gate 0x16 armed, TLV 0x19 = "0", voip
+ * FULL_SERVICE rat=WWAN; writing the real number moved voice to WLAN in
+ * seconds. So: require enough ASCII digits, and reject an all-zero string. */
+static int msisdn_is_provisioned(const char *s)
+{
+	size_t i, n = strlen(s);
+	int nonzero = 0;
+
+	if (n < MSISDN_MIN_DIGITS || n > MSISDN_MAX)
+		return 0;
+	for (i = 0; i < n; i++) {
+		if (s[i] < '0' || s[i] > '9')
+			return 0;
+		if (s[i] != '0')
+			nonzero = 1;
+	}
+	return nonzero;
+}
+
 /* IMSS GET 0x54 TLV 0x19 -> ASCII MSISDN. Returns 0 with out[] filled (may
  * be empty string = unset), -1 on transport failure. */
 static int get_msisdn(qmi_client_type c, char *out, size_t outsz)
@@ -479,7 +524,7 @@ static int imsa_tel_digits(char *out, size_t outsz)
 				if (str[k] >= '0' && str[k] <= '9')
 					out[o++] = (char)str[k];
 			out[o] = '\0';
-			if (o >= 7) {   /* sanity: a real subscriber number */
+			if (o >= MSISDN_MIN_DIGITS) {   /* sanity: a real subscriber number */
 				rc = 1;
 				break;
 			}
@@ -566,7 +611,7 @@ out:
  * budget — the SIM-loaded trigger runs us again later. */
 static void msisdn_phase(void)
 {
-	time_t deadline = time(NULL) + MSISDN_BUDGET_S;
+	time_t deadline = now_mono() + MSISDN_BUDGET_S;
 	char cur[MSISDN_MAX + 1], want[MSISDN_MAX + 1];
 	int wrote = 0;
 
@@ -574,11 +619,16 @@ static void msisdn_phase(void)
 	for (;;) {
 		qmi_client_type c = connect_svc(p_imss_get_service_object, "IMSS");
 
-		if (c && get_msisdn(c, cur, sizeof(cur)) == 0 && cur[0]) {
-			LOGI("msisdn already set (%zu digits)", strlen(cur));
-			p_client_release(c);
-			__system_property_set(MSISDN_PROP, "kept");
-			return;
+		if (c && get_msisdn(c, cur, sizeof(cur)) == 0) {
+			if (msisdn_is_provisioned(cur)) {
+				LOGI("msisdn already set (%zu digits)", strlen(cur));
+				p_client_release(c);
+				__system_property_set(MSISDN_PROP, "kept");
+				return;
+			}
+			if (cur[0])
+				LOGI("msisdn placeholder \"%s\" (%zu bytes) — treating as unset",
+				     cur, strlen(cur));
 		}
 		if (c)
 			p_client_release(c);
@@ -605,7 +655,7 @@ static void msisdn_phase(void)
 			return;
 		}
 
-		if (time(NULL) >= deadline) {
+		if (now_mono() >= deadline) {
 			LOGI("msisdn: no IMS registration within %ds, leaving pending",
 			     MSISDN_BUDGET_S);
 			return;
@@ -616,7 +666,7 @@ static void msisdn_phase(void)
 
 int main(void)
 {
-	time_t deadline = time(NULL) + TOTAL_BUDGET_S;
+	time_t deadline = now_mono() + TOTAL_BUDGET_S;
 	int wrote = 0;
 
 	if (!qmux_enabled()) {
@@ -639,7 +689,7 @@ int main(void)
 			                      wrote ? "applied" : "ok");
 			break;
 		}
-		if (time(NULL) >= deadline) {
+		if (now_mono() >= deadline) {
 			LOGE("giving up after %ds", TOTAL_BUDGET_S);
 			__system_property_set(STATUS_PROP, "failed");
 			return 0;
