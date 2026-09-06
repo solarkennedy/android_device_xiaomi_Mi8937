@@ -1,0 +1,12 @@
+# Publish the GSF device ID for the Pepito Tweaks "Google Play certification"
+# row. Pepito-only. Runs late (boot_completed) because it reads /data and only
+# has anything to read once GMS has checked in at least once.
+service pepito_gsfid /system_ext/bin/init.pepito-gsfid.sh
+    class late_start
+    user root
+    group root
+    oneshot
+    disabled
+
+on property:sys.boot_completed=1 && property:ro.vendor.xiaomi.device=pepito
+    start pepito_gsfid

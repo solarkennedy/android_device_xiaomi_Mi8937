@@ -3,3 +3,10 @@
 # onto an existing /data/system/ifw can be repaired with
 #   restorecon -R /data/system/ifw
 /data/system/ifw(/.*)?          u:object_r:ifw_data_file:s0
+
+# Pepito GSF-ID publisher (see pepito_gsfid.te)
+# /system_ext is a SYMLINK to /system/system_ext here, and images are labelled by the
+# real path - so the alternation form is required or the file silently keeps the
+# generic system_file label and the domain transition never happens. Same shape as
+# device/lineage/sepolicy/common/private/file_contexts uses for adb_root.
+/(system_ext|system/system_ext)/bin/init\.pepito-gsfid\.sh    u:object_r:pepito_gsfid_exec:s0

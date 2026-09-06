@@ -15,6 +15,20 @@ prebuilt_etc {
 
 // Init scripts
 
+// NOTE: no sub_dir - this lands in /vendor/etc/init/, which init auto-scans.
+// Do NOT move it to init/hw: files there are NOT scanned, they only load if
+// something imports them explicitly (init.xiaomi.device.rc works only because
+// mithorium-common's init.xiaomi.rc has an "import" line for it).
+prebuilt_etc {
+    name: "init.pepito-gsfid.rc",
+    src: "etc/init.pepito-gsfid.rc",
+    // sub_dir "init" is REQUIRED: prebuilt_etc defaults to <part>/etc/, so
+    // without it this lands at /system_ext/etc/ and init never loads it.
+    // (Do NOT use "init/hw" - that dir is not auto-scanned either.)
+    sub_dir: "init",
+    system_ext_specific: true,
+}
+
 prebuilt_etc {
     name: "init.xiaomi.device.rc",
     src: "etc/init.xiaomi.device.rc",
@@ -34,4 +48,14 @@ sh_binary {
     name: "init.goodix.sh",
     src: "bin/init.goodix.sh",
     vendor: true,
+}
+
+// system_ext, NOT vendor: this reads a file under /data/data, and Treble's
+// neverallows bar every non-coredomain from `open` on core_data_file_type and
+// from `search` on its dirs (system/sepolicy/private/domain.te). A vendor
+// domain cannot do this job at all; coredomain is exempt.
+sh_binary {
+    name: "init.pepito-gsfid.sh",
+    src: "bin/init.pepito-gsfid.sh",
+    system_ext_specific: true,
 }
