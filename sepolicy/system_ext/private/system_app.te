@@ -1,0 +1,4 @@
+# Pepito: LineageParts (u:r:system_app:s0) reads sys.pepito.gsf_id to show the
+# Google Services Framework device ID in the "Google Play certification" row of
+# Pepito Tweaks.
+get_prop(system_app, pepito_gsf_prop)

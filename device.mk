@@ -293,6 +293,8 @@ endif
 PRODUCT_PACKAGES += \
     fstab.qcom.ramdisk \
     init.baseband.sh \
+    init.pepito-gsfid.rc \
+    init.pepito-gsfid.sh \
     init.xiaomi.device.rc \
     init.xiaomi.device.sh
 

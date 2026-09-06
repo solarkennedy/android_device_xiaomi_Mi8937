@@ -1,0 +1,32 @@
+# ✅ APPLIED 2026-09-04 — kept as the record of what was changed in AOSP and why.
+#
+# Four neverallow exemptions were added to system/sepolicy so the pepito_gsfid
+# domain may read /data/data/com.google.android.gms/shared_prefs/Checkin.xml and
+# publish the Google Services Framework device ID as sys.pepito.gsf_id.
+#
+#   private/domain.te              :dir *              +  -pepito_gsfid
+#   private/domain.te              :file_class_set open +  -pepito_gsfid
+#   private/mlstrustedsubject.te   :file ~{...}         +  -pepito_gsfid
+#   private/mlstrustedsubject.te   :dir { read getattr search } + -pepito_gsfid
+#
+# The domain itself is declared in system/sepolicy/private/pepito_gsfid.te, NOT
+# here: plat policy cannot reference a type declared in the device tree, and the
+# exemptions above are plat rules. Only the set_prop stayed device-side
+# (pepito_gsfid_prop.te), because the property type is device-side and
+# system_ext may reference plat types.
+#
+# WHY, in one line: a custom ROM is never Play Protect certified, the GSF ID is
+# the only thing Google's registration page accepts, and that ID exists nowhere
+# outside GMS's app-private storage — not in the Gservices provider (it serves
+# uncertified_status but withholds android_id), not in the legacy
+# GoogleSettingsProvider, not in any property, settings namespace or dumpsys.
+#
+# ⚠️ COST, recorded honestly:
+#   * Divergence from AOSP in a core repo. RE-APPLY AFTER EVERY UPSTREAM MERGE —
+#     if these four lines are lost, the build fails the neverallow check, which
+#     is at least a loud failure rather than a silent one.
+#   * CTS/VTS neverallow tests would fail on such a build.
+#   * The grant is "read any app's private data", not "read GMS's" — SELinux
+#     types cannot be scoped to a package or a path. Practical exposure is much
+#     narrower (one hardcoded path, read-only, oneshot at boot, then exit), but
+#     the policy grant is broad and that distinction matters.

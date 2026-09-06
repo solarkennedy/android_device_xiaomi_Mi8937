@@ -5,3 +5,9 @@
 # vendor_wlc_prop precedent, so a coredomain app may set it while non-core
 # domains cannot.
 system_restricted_prop(pepito_wfc_prop)
+
+# sys.pepito.gsf_id — Google Services Framework device ID, published at boot by
+# init.pepito-gsfid.sh (pepito_gsfid.te) and read by LineageParts for the
+# Google Play certification row. system_restricted_prop following the
+# pepito_wfc_prop precedent above: coredomain-set-only.
+system_restricted_prop(pepito_gsf_prop)

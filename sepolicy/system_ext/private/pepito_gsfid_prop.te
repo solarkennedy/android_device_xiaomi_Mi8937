@@ -1,0 +1,10 @@
+# Pepito: let the GSF-ID publisher set its property.
+#
+# The pepito_gsfid domain itself is declared in AOSP plat policy
+# (system/sepolicy/private/pepito_gsfid.te) — it HAS to be, because the
+# neverallow exemptions it needs live in plat domain.te/mlstrustedsubject.te and
+# plat policy cannot reference a type declared out here in the device tree.
+#
+# This rule stays device-side because pepito_gsf_prop is device-side; system_ext
+# policy may reference plat types, which is the direction that works.
+set_prop(pepito_gsfid, pepito_gsf_prop)

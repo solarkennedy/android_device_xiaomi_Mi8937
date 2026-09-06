@@ -1,1 +1,2 @@
 persist.sys.pepito.wfc_enabled u:object_r:pepito_wfc_prop:s0
+sys.pepito.gsf_id u:object_r:pepito_gsf_prop:s0
