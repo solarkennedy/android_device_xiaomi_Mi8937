@@ -22,6 +22,12 @@
 
 XML=/data/data/com.google.android.gms/shared_prefs/Checkin.xml
 PROP=sys.pepito.gsf_id
+REFRESH=sys.pepito.gsf_refresh
+
+# Always clear the on-demand flag, whatever happens below: init triggers fire on a
+# CHANGE of value, so leaving it at 1 would make the next tap a no-op.
+finish() { setprop "$REFRESH" 0; }
+trap finish EXIT
 TAG='<string name="android_id">'
 
 [ -r "$XML" ] || exit 0

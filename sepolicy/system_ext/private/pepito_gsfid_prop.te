@@ -8,3 +8,22 @@
 # This rule stays device-side because pepito_gsf_prop is device-side; system_ext
 # policy may reference plat types, which is the direction that works.
 set_prop(pepito_gsfid, pepito_gsf_prop)
+
+
+# sys.pepito.gsf_refresh — set to 1 by LineageParts (system_app) from the Play
+# certification row to re-run the publisher without a reboot; init triggers on it
+# (init.pepito-gsfid.rc) and the script clears it back to 0 when it finishes, so a
+# later tap changes the value again and fires the trigger afresh.
+#
+# ⚠️ This is deliberately NOT a ctl.<service> control property. Two neverallows
+# forbid that, both hit on 2026-09-09:
+#   property.te:488 - an appdomain (system_app included) may never
+#                     `set` a ctl_* property_service;
+#   property.te:164 - a property type declared as bare `property_type` has no
+#                     owner attribute, so init's and dumpstate's blanket
+#                     property_type file grants violate the sysprop-owner rule.
+# system_restricted_prop() supplies the system ownership and keeps it
+# coredomain-set-only, following the pepito_wfc_prop precedent in property.te.
+system_restricted_prop(pepito_gsf_refresh_prop)
+set_prop(system_app, pepito_gsf_refresh_prop)
+set_prop(pepito_gsfid, pepito_gsf_refresh_prop)
