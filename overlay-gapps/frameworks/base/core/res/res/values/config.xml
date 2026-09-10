@@ -45,4 +45,19 @@
 
          Must NOT be set on the vanilla product: the package does not exist there. -->
     <string name="config_systemSpeechRecognizer" translatable="false">com.google.android.tts</string>
+
+    <!-- Pre-approve Android Auto's notification listener
+         (com.google.android.gearhead.notifications.SharedNotificationListenerManager$ListenerService,
+         declared by the AndroidAutoStubPrebuilt in /product/priv-app). Colon-separated package
+         list; NotificationManagerService resolves each package's NotificationListenerService
+         components at boot and, on FIRST boot only (no /data/system/notification_policy.xml
+         yet, or a new user), writes them into enabled_notification_listeners. So this takes
+         effect after a wipe/fresh flash, not a dirty flash; an existing unit still needs the
+         one-time "Allow notification access" toggle (or
+         `cmd notification allow_listener <component>`). The stub declares
+         default_autobind_listenerservice=false, so approval alone does not keep the service
+         bound; gearhead requests the bind itself when a head unit connects, exactly as after
+         a manual grant. The Play-updated Android Auto keeps the same component name, so the
+         approval survives the upgrade. Gapps-only: gearhead does not exist on vanilla. -->
+    <string name="config_defaultListenerAccessPackages" translatable="false">com.google.android.projection.gearhead</string>
 </resources>
