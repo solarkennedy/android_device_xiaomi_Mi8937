@@ -8,5 +8,27 @@ service pepito_gsfid /system_ext/bin/init.pepito-gsfid.sh
     oneshot
     disabled
 
-on property:sys.boot_completed=1 && property:ro.vendor.xiaomi.device=pepito
+# Triggered on CE-storage availability, NOT sys.boot_completed.
+#
+# The file this parses (/data/data/com.google.android.gms/shared_prefs/Checkin.xml)
+# lives in credential-encrypted storage. On a device WITH a screen lock that stays
+# locked until the user's first unlock, which is AFTER boot_completed - so the
+# original boot_completed trigger ran the script while the file was still
+# encrypted, it found nothing, exited silently, and the Tweaks row showed no ID.
+# That was the "row shows no Device ID" report of 2026-09-09; our whole bench
+# missed it because none of our units has a lock screen.
+#
+# sys.user.0.ce_available covers BOTH cases, so one trigger is enough (measured
+# on 9c2e6b00 2026-09-09):
+#   * no lock screen -> set at boot, no interaction, same moment as boot_completed
+#   * PIN set        -> stays unset at boot_completed, flips ~5s after the PIN
+#
+# ⚠️ The value is the string "true", not "1".
+on property:sys.user.0.ce_available=true && property:ro.vendor.xiaomi.device=pepito
+    start pepito_gsfid
+
+# On-demand re-run from the Pepito Tweaks row (see pepito_gsfid_prop.te). The
+# script clears the property back to 0 on exit so the next tap is a fresh change
+# and fires this again - init property triggers only fire on a CHANGE of value.
+on property:sys.pepito.gsf_refresh=1 && property:ro.vendor.xiaomi.device=pepito
     start pepito_gsfid
