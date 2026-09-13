@@ -87,13 +87,15 @@ service vendor.ims_rtp_daemon /vendor/bin/ims_rtp_daemon
 
 # VoLTE/VoWiFi self-heal oneshot: asserts modem NV ims_test_mode=0 + qipcall
 # bools + the IWLAN gate over v01 IMSS QMI (the A15 qcril ims module is
-# v02-only and cannot), then makes sure the IMS MSISDN is provisioned (learned
-# from the LTE registration URI; VoWiFi voice is SMS-only without it). NV
-# persists in modem EFS, so the steady-state run is read-only (status props
-# vendor.qmux.ims_enabler = ok, vendor.qmux.ims_msisdn = kept); a fresh unit
-# gets the writes applied (= applied / set). Started at boot and again when the
-# user turns Wi-Fi calling on (see below — a gsm.sim.state trigger is impossible
-# from a vendor rc). Retries internally until the modem is up.
+# v02-only and cannot), then reconciles the IMS MSISDN against the number the
+# network reports in the LTE registration URI (VoWiFi voice is SMS-only with a
+# missing one, and stays on WWAN with a STALE one — e.g. after a port-in, which
+# never changes the ICCID). NV persists in modem EFS, so the steady-state run
+# is read-only (status props vendor.qmux.ims_enabler = ok,
+# vendor.qmux.ims_msisdn = kept); a fresh unit gets the writes applied
+# (= applied / set), and a changed number reads `updated`. Started at boot and
+# again when the user turns Wi-Fi calling on (see below — a gsm.sim.state
+# trigger is impossible from a vendor rc). Retries internally until the modem is up.
 service qmux_ims_enabler /vendor/bin/ims_enabler
     class main
     user radio

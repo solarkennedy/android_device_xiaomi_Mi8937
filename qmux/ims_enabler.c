@@ -602,50 +602,77 @@ out:
 	return rc;
 }
 
-/* Phase 2: make sure the modem holds the line's MSISDN (VoWiFi voice gate).
- * Fast path (every provisioned unit): one GET, "kept". Slow path (virgin
- * unit): wait for IMS to register on LTE, learn the number from the
- * registration URI, re-assert the settings table (the SIM is in now, so the
- * writes land in the per-subscription store), then write + verify.
+/* Phase 2: make sure the modem holds *the line's current* MSISDN (VoWiFi voice
+ * gate).
+ *
+ * The authority is the network, not what we wrote last time: IMSA
+ * GET_REGISTRATION_STATUS TLV 0x15 carries the P-Associated-URI list the
+ * network hands back in the REGISTER 200 OK, so "tel:+1XXXXXXXXXX" is always
+ * this subscription's number right now. We reconcile the IMSS store against
+ * it:
+ *   equal              -> "kept"    (the steady-state case, no NV write)
+ *   empty/placeholder  -> "set"     (virgin unit — the original part-52 fix)
+ *   a *different* real number -> "updated"
+ *
+ * ⚠️ That last case is why this is a compare and not a presence check. A
+ * ported-in number (2026-09-12, unit 9c2e6b00: store held the old Warp
+ * 14254788846 while the network said tel:+14156962801) or a re-used phone with
+ * someone else's SIM leaves a perfectly well-formed but WRONG MSISDN in EFS.
+ * The earlier "looks provisioned -> kept" fast path never corrected it, so
+ * VoWiFi voice stayed on WWAN forever with no visible tell. A number change
+ * never bumps the ICCID, so nothing else in the stack invalidates it either.
+ *
  * Never fails the boot: "pending" just means no SIM/registration inside the
- * budget — the SIM-loaded trigger runs us again later. */
+ * budget, and a plausible-but-unverified store stays "kept" — the WFC-toggle
+ * trigger runs us again later, as does the next boot. */
 static void msisdn_phase(void)
 {
 	time_t deadline = now_mono() + MSISDN_BUDGET_S;
 	char cur[MSISDN_MAX + 1], want[MSISDN_MAX + 1];
-	int wrote = 0;
+	int have_cur = 0, wrote = 0;
 
 	__system_property_set(MSISDN_PROP, "pending");
+	cur[0] = '\0';
 	for (;;) {
-		qmi_client_type c = connect_svc(p_imss_get_service_object, "IMSS");
+		/* Read the store ONCE (retrying only while IMSS is still coming
+		 * up). Nothing else writes it while we run, so re-reading it on
+		 * every poll would just double the QMI traffic of the wait. */
+		if (!have_cur) {
+			qmi_client_type c = connect_svc(p_imss_get_service_object, "IMSS");
 
-		if (c && get_msisdn(c, cur, sizeof(cur)) == 0) {
-			if (msisdn_is_provisioned(cur)) {
-				LOGI("msisdn already set (%zu digits)", strlen(cur));
+			have_cur = (c && get_msisdn(c, cur, sizeof(cur)) == 0);
+			if (c)
 				p_client_release(c);
+		}
+
+		if (imsa_tel_digits(want, sizeof(want)) == 1) {
+			if (have_cur && strcmp(cur, want) == 0) {
+				LOGI("msisdn matches registration URI (%zu digits)",
+				     strlen(cur));
 				__system_property_set(MSISDN_PROP, "kept");
 				return;
 			}
-			if (cur[0])
-				LOGI("msisdn placeholder \"%s\" (%zu bytes) — treating as unset",
-				     cur, strlen(cur));
-		}
-		if (c)
-			p_client_release(c);
+			/* A stale real number is the number-change case; an
+			 * unset/short/all-zero one is the virgin case. */
+			int stale = have_cur && msisdn_is_provisioned(cur);
 
-		if (imsa_tel_digits(want, sizeof(want)) == 1) {
+			if (have_cur && cur[0])
+				LOGI("msisdn in store \"%s\" != registration URI — %s",
+				     cur, stale ? "number changed, replacing"
+				                : "treating as unset");
 			/* SIM is in and IMS registered: re-assert the table so
 			 * the per-subscription store gets the gate too. */
 			if (pass(&wrote) == 0 && wrote)
 				LOGI("re-asserted settings with SIM loaded (%d writes)", wrote);
-			c = connect_svc(p_imss_get_service_object, "IMSS");
+			qmi_client_type c = connect_svc(p_imss_get_service_object, "IMSS");
 			if (c && set_msisdn(c, want) == 0 &&
 			    get_msisdn(c, cur, sizeof(cur)) == 0 &&
 			    strcmp(cur, want) == 0) {
-				LOGI("msisdn: set from registration URI (%zu digits, verified)",
-				     strlen(want));
+				LOGI("msisdn: %s from registration URI (%zu digits, verified)",
+				     stale ? "updated" : "set", strlen(want));
 				p_client_release(c);
-				__system_property_set(MSISDN_PROP, "set");
+				__system_property_set(MSISDN_PROP,
+				                      stale ? "updated" : "set");
 				return;
 			}
 			if (c)
@@ -656,8 +683,18 @@ static void msisdn_phase(void)
 		}
 
 		if (now_mono() >= deadline) {
-			LOGI("msisdn: no IMS registration within %ds, leaving pending",
-			     MSISDN_BUDGET_S);
+			/* No registration to check against. Leave a plausible
+			 * store alone rather than guessing — but say so, so a
+			 * "kept" that never saw the network is distinguishable
+			 * in a bug report only by the log line below. */
+			if (have_cur && msisdn_is_provisioned(cur)) {
+				LOGI("msisdn: no IMS registration within %ds, keeping stored \"%s\" unverified",
+				     MSISDN_BUDGET_S, cur);
+				__system_property_set(MSISDN_PROP, "kept");
+			} else {
+				LOGI("msisdn: no IMS registration within %ds, leaving pending",
+				     MSISDN_BUDGET_S);
+			}
 			return;
 		}
 		sleep(RETRY_SLEEP_S);
