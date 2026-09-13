@@ -246,6 +246,18 @@ PRODUCT_SYSTEM_PROPERTIES += \
     ro.face.sense_service=true
 endif
 
+# Hide the Settings "Use SIM" switch (frameworks/opt/telephony patch, gated on
+# ro.telephony.uicc_apps_toggle). The prebuilt QCRIL mis-tracks the UIM
+# provisioning session when the card carries a CSIM next to the USIM (every
+# Verizon-profile SIM): DISABLE leaves the GW session stuck in
+# DEACTIVATION_IN_PROGRESS, every later ENABLE is refused with GENERIC_FAILURE,
+# and USER_PREF=0 in qcril.db re-wedges the phone on every boot. Only a qcrild
+# restart recovers, which a user cannot do. See PLAN-misc.md (SIM toggle trap).
+ifeq ($(TARGET_DEVICE_PEPITO),true)
+PRODUCT_SYSTEM_PROPERTIES += \
+    ro.telephony.uicc_apps_toggle=false
+endif
+
 # Fingerprint
 ifeq ($(PRODUCT_HARDWARE),Mi8937)
 PRODUCT_COPY_FILES += \
