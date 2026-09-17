@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+
+     pepito ships its own OTA feed (see lineage.updater.uri in device.mk), so
+     the Updater's top-level "Show changelog" item must open our changelog,
+     not download.lineageos.org/<device>/changes (upstream Mi8937's page).
+     The stock string takes the device name as %1$s; ours has no placeholder
+     and the extra format argument is ignored.
+-->
+<resources>
+    <string name="menu_changelog_url" translatable="false">https://github.com/solarkennedy/lineageos-pepito/blob/lineageos23.2/CHANGELOG.md</string>
+</resources>
