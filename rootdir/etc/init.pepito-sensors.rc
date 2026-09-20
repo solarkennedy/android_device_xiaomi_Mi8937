@@ -1,0 +1,16 @@
+# BHI160B: the BST BHy HAL (sensors.native.so) stores its per-sensor
+# calibration profiles in /data/misc/sensor and hardcodes the path. Without
+# this dir it logs "open file /data/misc/sensor/bhy_profile_calib_* failed"
+# every activate/deactivate and calibration never persists.
+#
+# system_ext, NOT vendor: stock creates this from init.target.rc, but on A16 a
+# vendor rc runs as vendor_init, and bhy_data_file is a core_data_file_type
+# (it has to be - the path is under /data/misc), which vendor_init may not
+# create. The mkdir there failed with "avc: denied { create } ...
+# scontext=vendor_init tcontext=bhy_data_file" on every fresh flash under
+# Enforcing (user report, 20260915 build); bench units only had the dir as a
+# leftover from earlier boots. A system_ext rc runs as init, which may.
+#
+# Property-first trigger form: see init.target.rc, the other form did not fire.
+on property:ro.vendor.xiaomi.device=pepito && post-fs-data
+    mkdir /data/misc/sensor 0770 system system

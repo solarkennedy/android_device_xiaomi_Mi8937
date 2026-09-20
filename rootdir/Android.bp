@@ -29,6 +29,15 @@ prebuilt_etc {
     system_ext_specific: true,
 }
 
+// system_ext for the same reason as the gsfid rc's script below: it touches a
+// core_data_file_type under /data/misc, which vendor_init may not create.
+prebuilt_etc {
+    name: "init.pepito-sensors.rc",
+    src: "etc/init.pepito-sensors.rc",
+    sub_dir: "init",
+    system_ext_specific: true,
+}
+
 prebuilt_etc {
     name: "init.xiaomi.device.rc",
     src: "etc/init.xiaomi.device.rc",

@@ -307,6 +307,7 @@ PRODUCT_PACKAGES += \
     init.baseband.sh \
     init.pepito-gsfid.rc \
     init.pepito-gsfid.sh \
+    init.pepito-sensors.rc \
     init.xiaomi.device.rc \
     init.xiaomi.device.sh
 
