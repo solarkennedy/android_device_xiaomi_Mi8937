@@ -1,0 +1,20 @@
+//
+// Copyright (C) 2026 The LineageOS Project
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+
+// Listed in configs/sensors/hals.conf IN PLACE OF sensors.native.so, which it
+// dlopens. 64-bit only: android.hardware.sensors@1.0-service is a 64-bit process.
+cc_library_shared {
+    name: "sensors.pepito_bhy",
+    srcs: ["bhy_wrapper.c"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+    header_libs: ["libhardware_headers"],
+    shared_libs: ["liblog"],
+    compile_multilib: "64",
+    vendor: true,
+}
