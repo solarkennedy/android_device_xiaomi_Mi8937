@@ -363,10 +363,16 @@ else ifeq ($(PRODUCT_HARDWARE),Mi8937)
 $(call inherit-product, vendor/xiaomi/Mi8937/Mi8937-vendor.mk)
 endif
 
-# Pepito-specific hals.conf adds sensors.native.so (BST BHy HAL) alongside the
-# SSC sub-HAL.  This overrides the mithorium-common base which only has sensors.ssc.so.
-# sensors.native.so is only installed for this build (Mi8937-vendor.mk), so other
-# variants picking up this file would get a harmless "not found" warning from multihal.
+# Pepito-specific hals.conf adds the BST BHy HAL alongside the SSC sub-HAL.
+# This overrides the mithorium-common base which only has sensors.ssc.so.
+# It names sensors.pepito_bhy.so (sensors/bhy-wrapper), NOT the sensors.native.so
+# blob directly: the blob advertises resolution=16 (a bit width), and Android 11+
+# SensorService quantizes samples to it -> raw accel in 2 m/s^2 steps. The
+# wrapper dlopens the blob and corrects the list. On other variants the blob is
+# absent, the wrapper reports 0 sensors, and multihal carries on.
+PRODUCT_PACKAGES += \
+    sensors.pepito_bhy
+
 PRODUCT_COPY_FILES += \
     device/xiaomi/Mi8937/configs/sensors/hals.conf:$(TARGET_COPY_OUT_VENDOR)/etc/sensors/hals.conf
 
