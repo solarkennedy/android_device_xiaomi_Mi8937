@@ -88,8 +88,10 @@ static void fix_sensor(struct sensor_t* s) {
         case SENSOR_TYPE_ROTATION_VECTOR:
         case SENSOR_TYPE_GAME_ROTATION_VECTOR:
         case SENSOR_TYPE_GEOMAGNETIC_ROTATION_VECTOR:
-            max = UNIT_MAX;
-            break;
+            /* Quaternions are Q14, not full-scale 32768. */
+            s->maxRange = UNIT_MAX;
+            s->resolution = 1.0f / 16384.0f;
+            return;
         case SENSOR_TYPE_PRESSURE:
             s->maxRange = PRESSURE_MAX;
             s->resolution = PRESSURE_RES;

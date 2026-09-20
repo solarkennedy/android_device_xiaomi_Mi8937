@@ -364,7 +364,10 @@ $(call inherit-product, vendor/xiaomi/Mi8937/Mi8937-vendor.mk)
 endif
 
 # Pepito-specific hals.conf adds the BST BHy HAL alongside the SSC sub-HAL.
-# This overrides the mithorium-common base which only has sensors.ssc.so.
+# ⚠ This copy does NOT install: PRODUCT_COPY_FILES is first-wins and
+# mithorium.mk (inherited above) already claims the destination, so the file
+# that ships is device/xiaomi/mithorium-common/configs/sensors/hals.conf.
+# Keep the two identical.
 # It names sensors.pepito_bhy.so (sensors/bhy-wrapper), NOT the sensors.native.so
 # blob directly: the blob advertises resolution=16 (a bit width), and Android 11+
 # SensorService quantizes samples to it -> raw accel in 2 m/s^2 steps. The
