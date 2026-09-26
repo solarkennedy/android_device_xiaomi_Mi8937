@@ -1,0 +1,14 @@
+// The notification half of BLE-beacon notifications. The scanning half lives in
+// XiaomiParts (mithorium-common), which shares the system UID - and Settings
+// locks every notification channel of UID 1000 ("System notifications cannot be
+// modified"). Posting from this ordinary-UID app is what lets the per-status
+// channels be edited like any app's. Not privileged: it needs no permissions
+// beyond POST_NOTIFICATIONS.
+android_app {
+    name: "BeaconNotifier",
+
+    srcs: ["src/**/*.java"],
+    resource_dirs: ["res"],
+    certificate: "platform",
+    platform_apis: true,
+}
