@@ -3,14 +3,16 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Only platform-signed senders (XiaomiParts) may hand us a beacon. -->
+    <permission android:name="org.lineageos.pepito.beaconnotifier.POST"
+                android:protectionLevel="signature" />
 
     <application android:label="@string/app_name"
                  android:icon="@drawable/ic_beacon">
 
-        <!-- Exported so XiaomiParts (system UID) can reach it; the receiver itself
-             rejects any sender that is not the system UID. -->
         <receiver android:name=".BeaconReceiver"
-                  android:exported="true">
+                  android:exported="true"
+                  android:permission="org.lineageos.pepito.beaconnotifier.POST">
             <intent-filter>
                 <action android:name="org.lineageos.pepito.beaconnotifier.BEACON" />
             </intent-filter>

@@ -2,15 +2,13 @@
 // XiaomiParts (mithorium-common), which shares the system UID - and Settings
 // locks every notification channel of UID 1000 ("System notifications cannot be
 // modified"). Posting from this ordinary-UID app is what lets the per-status
-// channels be edited like any app's. Not privileged, and NOT platform-signed:
-// DefaultPermissionGrantPolicy grants POST_NOTIFICATIONS as SYSTEM_FIXED to every
-// platform-signed system app, and a fixed grant locks every channel again
-// (PreferencesHelper.updateFixedImportance). releasekey is the ordinary app key.
+// channels be edited like any app's. Not privileged: it needs no permissions
+// beyond POST_NOTIFICATIONS.
 android_app {
     name: "BeaconNotifier",
 
     srcs: ["src/**/*.java"],
     resource_dirs: ["res"],
-    certificate: "releasekey",
-    sdk_version: "system_current",
+    certificate: "platform",
+    platform_apis: true,
 }
