@@ -80,11 +80,7 @@ ifeq ($(TARGET_DEVICE_PEPITO),true)
 # to run in the system UID so both its PM and Intent Firewall backends work with
 # no root and no Shizuku; /data/system/ifw is relabelled ifw_data_file for the
 # latter (sepolicy/system_ext/private). See PLAN-blocker.md.
-# BeaconNotifier: the notification half of BLE-beacon notifications; the scanner
-# is in XiaomiParts (system UID, whose channels Settings won't let the user edit).
-# Ordinary UID, platform-signed, one signature-guarded receiver. PLAN-ble-beacon-notify.md.
 PRODUCT_PACKAGES += \
-    BeaconNotifier \
     Blocker \
     OpenEUICC \
     PepitoLauncher2 \
