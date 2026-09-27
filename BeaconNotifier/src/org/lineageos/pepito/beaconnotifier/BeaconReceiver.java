@@ -58,6 +58,12 @@ public class BeaconReceiver extends BroadcastReceiver {
         if (!ACTION_BEACON.equals(intent.getAction())) {
             return;
         }
+        // Only XiaomiParts (the system UID) may post through us. We can't use a
+        // signature permission: this app is deliberately not platform-signed.
+        if (getSentFromUid() != android.os.Process.SYSTEM_UID) {
+            Log.w(TAG, "dropping beacon from uid " + getSentFromUid());
+            return;
+        }
         final int txId = intent.getIntExtra(EXTRA_TXID, 0);
         final int seq = intent.getIntExtra(EXTRA_SEQ, 0);
         final int status = intent.getIntExtra(EXTRA_STATUS, 3) & 3;
