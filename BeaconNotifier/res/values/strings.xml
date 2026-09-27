@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Beacon</string>
-    <string name="channel_ok">Beacon: OK</string>
-    <string name="channel_warning">Beacon: warning</string>
-    <string name="channel_critical">Beacon: critical</string>
-    <string name="channel_plain">Beacon</string>
-</resources>
