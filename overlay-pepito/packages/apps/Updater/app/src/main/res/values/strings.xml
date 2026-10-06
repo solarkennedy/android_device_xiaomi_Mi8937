@@ -10,5 +10,5 @@
      and the extra format argument is ignored.
 -->
 <resources>
-    <string name="menu_changelog_url" translatable="false">https://github.com/solarkennedy/lineageos-pepito/blob/lineageos23.2/CHANGELOG.md</string>
+    <string name="menu_changelog_url" translatable="false">https://github.com/solarkennedy/lineageos-pepito/blob/lineageos24.0/CHANGELOG.md</string>
 </resources>
