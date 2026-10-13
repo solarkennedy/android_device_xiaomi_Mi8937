@@ -212,8 +212,16 @@ PRODUCT_VENDOR_PROPERTIES += \
 # assets on solarkennedy/lineageos-pepito; the JSON below is generated per
 # release by lineageos-pepito/scripts/gen-ota-json.py. No {device}/{type}/{incr}
 # placeholders needed since the file already covers only this device.
+#
+# Final 23.2 release: this build reads the lineageos24.0 feed (API-v2 shape,
+# which our Updater fork parses) and allows the major-version jump, so the
+# Updater offers LineageOS 24.0 in place. The Updater only lists builds newer
+# than ro.build.date.utc, so a 24.0 release must be cut AFTER this build.
+# This release itself is still published to the lineageos23.2 feed, which is
+# what phones on older 23.2 builds read.
 PRODUCT_SYSTEM_PROPERTIES += \
-    lineage.updater.uri=https://raw.githubusercontent.com/solarkennedy/lineageos-pepito/lineageos23.2/pepito.json
+    lineage.updater.uri=https://raw.githubusercontent.com/solarkennedy/lineageos-pepito/lineageos24.0/pepito.json \
+    lineage.updater.allow_major_upgrades=true
 
 # Wi-Fi calling (PLAN-wifi-calling.md): the 2017 MPSS is modem-centric
 # ("legacy") IWLAN only — qcril must own the IWLAN RAT instead of deferring to
