@@ -394,8 +394,16 @@ static const uint8_t *find_tlv(const uint8_t *buf, unsigned int len,
 	return hit;
 }
 
+/* The blob's service-object getters need the exact IDL minor version baked
+ * into libqmiservices, so probe for it. IMSS/IMSA sit well under 300, but NAS
+ * is 321 (nas-probe hard-codes nas_get_service_object_internal_v01(1, 321, 6))
+ * - a 0..300 cap made the usage phase fail on the first flashed build
+ * (new2 2026-10-15: vendor.pepito.modem.usage=failed while the modem itself
+ * already held 2). */
+#define IDL_MINOR_MAX 512
+
 /* Connect a QCCI client to a v01 service object found via a getter that
- * needs the blob's exact IDL minor (probe 0..300, same as the diag probes). */
+ * needs the blob's exact IDL minor (probe 0..IDL_MINOR_MAX). */
 static qmi_client_type connect_svc(qmi_idl_service_object_type (*getter)(int, int, int),
                                    const char *name)
 {
@@ -403,7 +411,7 @@ static qmi_client_type connect_svc(qmi_idl_service_object_type (*getter)(int, in
 	qmi_client_type c = NULL;
 	char osbuf[512];
 
-	for (int m = 0; m <= 300 && !so; m++)
+	for (int m = 0; m <= IDL_MINOR_MAX && !so; m++)
 		so = getter(1, m, 6);
 	if (!so) {
 		LOGE("no %s service object", name);
@@ -578,7 +586,7 @@ static int pass(int *wrote)
 	char osbuf[512];
 	int rc = -1;
 
-	for (int m = 0; m <= 300 && !so; m++)
+	for (int m = 0; m <= IDL_MINOR_MAX && !so; m++)
 		so = p_imss_get_service_object(1, m, 6);
 	if (!so) {
 		LOGE("no imss service object");
