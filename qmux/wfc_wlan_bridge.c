@@ -49,6 +49,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <linux/if.h>
@@ -112,6 +113,35 @@ static int qmux_enabled(void)
 	if (__system_property_get("ro.vendor.qmux.enable", v) > 0)
 		return strcmp(v, "1") == 0;
 	return 0;
+}
+
+/* The user's Wi-Fi-calling toggle, mirrored by init.qmux.rc into a vendor prop
+ * this (vendor) domain is already allowed to read (vendor_qmux_prop); the
+ * Settings-owned persist.sys.pepito.wfc_enabled is not vendor-readable. The
+ * feeder now runs for the life of the boot so SOMETHING always clears a stale
+ * modem WLAN-available entry on wlan0-down (the IWLAN-first "emergency calls
+ * only" wedge), but only FEEDS the modem when WFC is on. Unset = off. */
+#define WFC_ON_PROP "vendor.qmux.wfc_on"
+static int wfc_on(void)
+{
+	char v[PROP_VALUE_MAX] = {0};
+	if (__system_property_get(WFC_ON_PROP, v) > 0)
+		return strcmp(v, "1") == 0;
+	return 0;
+}
+
+/* Block until the WFC toggle changes (zero wakeups) with a safety re-check
+ * timeout. When WFC is off nothing can arm WLAN (only this feeder does, and
+ * only when on), so once cleared there is nothing to watch — we just wait for
+ * WFC to come back. A short timeout is used while a clear is still pending so
+ * it is retried promptly. */
+static void wait_wfc_change(int timeout_sec)
+{
+	const prop_info *pi = __system_property_find(WFC_ON_PROP);
+	struct timespec ts = { .tv_sec = timeout_sec, .tv_nsec = 0 };
+	if (!pi) { sleep(timeout_sec > 0 ? timeout_sec : 60); return; }
+	uint32_t serial = __system_property_serial(pi);
+	__system_property_wait(pi, serial, &serial, timeout_sec > 0 ? &ts : NULL);
 }
 
 /* Set STATUS_PROP only on change (avoids property-set spam each poll). */
@@ -401,6 +431,23 @@ int main(int argc, char **argv)
 				sleep(FAST_SEC);
 				continue;
 			}
+		}
+
+		/* WFC off: never feed/arm. Make sure no stale WLAN-available is left to
+		 * wedge cold IMS re-attach (the gap the old WFC-gated START left — with
+		 * the feeder stopped, nothing ran to clear it), then block on the toggle
+		 * with no wakeups. This is what lets the daemon run for the whole boot
+		 * yet burn no feeding power when WFC is off. */
+		if (!wfc_on()) {
+			if (wlan_reported && send_wlan_unavailable() == 0) {
+				wlan_reported = 0;
+				LOGI("WFC off: cleared WLAN availability");
+			}
+			state = ST_SEARCH;
+			memset(cur_bssid, 0, 6);
+			set_status("off", &status);
+			wait_wfc_change(wlan_reported ? 10 : 300);
+			continue;
 		}
 
 		struct wlan_info w;

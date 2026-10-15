@@ -191,9 +191,13 @@ on boot && property:ro.vendor.qmux.enable=1
     # VoLTE NV self-heal (oneshot; QCCI waits for the modem internally, and
     # ordering vs the IMS daemons is irrelevant — it only touches modem NV).
     start qmux_ims_enabler
-    # NOTE: qmux_wfc_bridge (the VoWiFi feeder) is NOT started here — it is
-    # gated on the user's Wi-Fi-calling toggle below, so it does not run (and
-    # burns no power feeding the modem) when WFC is off in Settings.
+    # qmux_wfc_bridge (VoWiFi feeder) runs for the life of the boot so SOMETHING
+    # always clears a stale modem WLAN-available entry on wlan0-down — the cause
+    # of the IWLAN-first "emergency calls only" wedge after an RF drop. It only
+    # FEEDS the modem when WFC is on (gated internally on vendor.qmux.wfc_on,
+    # mirrored from the toggle below); when WFC is off it clears once then blocks
+    # on that prop with no wakeups, so it still burns no feeding power while off.
+    start qmux_wfc_bridge
 
 # VoWiFi WLAN feeder start/stop, gated on the user's Wi-Fi-calling setting.
 # WfcBridge (a small platform app, ContentObserver on Settings wfc_ims_enabled)
@@ -203,7 +207,10 @@ on boot && property:ro.vendor.qmux.enable=1
 # moment WFC is turned off. The daemon self-establishes IWLAN then idles
 # (see wfc_wlan_bridge.c).
 on property:persist.sys.pepito.wfc_enabled=1 && property:ro.vendor.qmux.enable=1
-    start qmux_wfc_bridge
+    # Mirror the toggle into the vendor prop the always-on feeder reads to
+    # un-gate feeding (it is a vendor domain; pepito_wfc_prop is not vendor-
+    # readable). The feeder itself is already running from `on boot`.
+    setprop vendor.qmux.wfc_on 1
     # One-shot: arm ps_sys field 4 in modem EFS the first time WFC is enabled
     # (no-op once armed). Runs alongside the feeder; the modem may only re-read
     # this config at cold boot, so on a truly fresh unit the field is written
@@ -229,7 +236,10 @@ on property:persist.sys.pepito.wfc_enabled=1 && property:ro.vendor.qmux.enable=1
 # radio_prop. The SIM-loaded re-run therefore rides the WFC-on trigger above.
 
 on property:persist.sys.pepito.wfc_enabled=0
-    stop qmux_wfc_bridge
+    # Feeder keeps running (it self-idles, blocking on vendor.qmux.wfc_on, and
+    # clears WLAN itself); just tell it to stop feeding. qmux_wfc_down below is
+    # the belt-and-suspenders fast clear on this same edge.
+    setprop vendor.qmux.wfc_on 0
 
 # WFC just turned off (or booted off): clear any WLAN availability the feeder
 # (or a previous boot) left in the modem, so cold IMS re-attach stays on the

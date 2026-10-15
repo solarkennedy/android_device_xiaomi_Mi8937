@@ -1,3 +1,9 @@
 # Pepito: vendor_init sets the keymaster version-spoof props from
 # vendor/build.prop (see device.mk ro.keymaster.xxx.* block).
 set_prop(vendor_init, vendor_pepito_keymaster_prop)
+
+# Pepito: vendor_init mirrors the Wi-Fi-calling toggle into vendor.qmux.wfc_on
+# (init.qmux.rc) so the always-on wfc_wlan_bridge feeder can gate feeding on a
+# vendor-readable prop — the Settings-owned persist.sys.pepito.wfc_enabled is
+# not vendor-readable.
+set_prop(vendor_init, vendor_qmux_prop)
