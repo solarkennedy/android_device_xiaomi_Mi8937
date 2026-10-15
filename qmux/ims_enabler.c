@@ -44,9 +44,31 @@
  * gsm.sim.state=LOADED, and a still-running boot instance re-asserts the
  * settings once it sees IMS registered (SIM necessarily in by then).
  *
- * Observable: sets vendor.qmux.ims_enabler = ok | applied | failed | off
- * and vendor.qmux.ims_msisdn = kept | set | pending | failed, and logs to
- * logcat (tag ims_enabler).
+ * Third phase (PLAN-emergency-only.md, 2026-10-14): NAS usage_preference.
+ * A voice-centric UE (the stock/Verizon default, NV mmode/ue_usage_setting)
+ * whose IMS registration drops while camped on its home cell has CM demand
+ * voice, find none, and hand reg a "voice not available" cause: the home
+ * PLMN goes on the NAS backoff-forbidden list and the phone sits on
+ * "Emergency calls only" until something forces a fresh attach. Data-centric
+ * short-circuits that in CM (cmsds.c: the "Disabling LTE as device is voice
+ * centric" branch is not taken), so the same scenario holds REGISTERED with
+ * full service — matched A/B on new2 with F3 modem logs, zero forbiddance
+ * lines. SMS still rides IMS. The value is a user switch (Settings > System >
+ * Modem tweaks, persist.gotweak.modem_data_centric, default ON) so it has
+ * both an ON and an OFF value: off re-asserts the stock voice-centric 1.
+ *   NAS GET_SYSTEM_SELECTION_PREFERENCE (0x34) rsp TLV 0x1F u32 usage
+ *   NAS SET_SYSTEM_SELECTION_PREFERENCE (0x33) req TLV 0x21 u32 usage
+ *   1 = VOICE_CENTRIC, 2 = DATA_CENTRIC (libqmi; blob IDL confirms u32)
+ * Read-compare-write like the IMSS table, so the steady state is one GET; a
+ * SET is only sent on mismatch because it kicks a PLMN reselection. Asserted
+ * at boot (not live from Settings) so the modem gets one clean cold attach
+ * from a known state; the switch prompts for a restart.
+ *
+ * Observable: sets vendor.qmux.ims_enabler = ok | applied | failed | off,
+ * vendor.qmux.ims_msisdn = kept | set | pending | failed, and
+ * vendor.pepito.modem.usage = 1 | 2 (the verified readback) | failed | off —
+ * that last one is a vendor_public_prop so the Settings row can show
+ * "applied" vs "waiting for a restart". Logs to logcat (tag ims_enabler).
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -83,6 +105,16 @@
 #define IMSA_GET_REGISTRATION_STATUS 0x0020
 #define IMSA_URI_LIST_TLV        0x15   /* u8 count, then [u8 len][bytes]... */
 
+#define NAS_SET_SYS_SEL_PREF     0x0033
+#define NAS_GET_SYS_SEL_PREF     0x0034
+#define NAS_USAGE_GET_TLV        0x1F   /* GET 0x34 rsp: u32 usage_preference */
+#define NAS_USAGE_SET_TLV        0x21   /* SET 0x33 req: u32 usage_preference */
+#define USAGE_VOICE_CENTRIC      1
+#define USAGE_DATA_CENTRIC       2
+#define USAGE_PROP               "vendor.pepito.modem.usage"
+#define DATA_CENTRIC_PROP        "persist.gotweak.modem_data_centric"
+#define USAGE_BUDGET_S           60   /* modem is up by now: IMSS pass just succeeded */
+
 #define QMI_CLIENT_INSTANCE_ANY  0xffff
 
 typedef void *qmi_client_type;
@@ -104,6 +136,7 @@ static int (*p_client_send_raw_msg_sync)(qmi_client_type, unsigned int,
 static int (*p_client_release)(qmi_client_type);
 static qmi_idl_service_object_type (*p_imss_get_service_object)(int, int, int);
 static qmi_idl_service_object_type (*p_imsa_get_service_object)(int, int, int);
+static qmi_idl_service_object_type (*p_nas_get_service_object)(int, int, int);
 
 static void ind_cb(qmi_client_type h, unsigned int msg_id, void *buf,
                    unsigned int len, void *cbd)
@@ -148,10 +181,12 @@ static int resolve_symbols(void)
 	                            dlsym(svc, "imss_get_service_object_internal_v01");
 	p_imsa_get_service_object = (qmi_idl_service_object_type (*)(int, int, int))
 	                            dlsym(svc, "imsa_get_service_object_internal_v01");
+	p_nas_get_service_object = (qmi_idl_service_object_type (*)(int, int, int))
+	                           dlsym(svc, "nas_get_service_object_internal_v01");
 
 	if (!p_client_init_instance || !p_client_send_raw_msg_sync ||
 	    !p_client_release || !p_imss_get_service_object ||
-	    !p_imsa_get_service_object) {
+	    !p_imsa_get_service_object || !p_nas_get_service_object) {
 		LOGE("dlsym failed: %s", dlerror());
 		return -1;
 	}
@@ -701,6 +736,79 @@ static void msisdn_phase(void)
 	}
 }
 
+/* Phase 3: NAS usage_preference (voice- vs data-centric), from the user's
+ * Modem-tweaks switch. Unset counts as ON, matching the build-prop default and
+ * the Settings fallback; only an explicit "0" asks for the stock value. */
+static uint32_t wanted_usage(void)
+{
+	char v[PROP_VALUE_MAX] = {0};
+
+	if (__system_property_get(DATA_CENTRIC_PROP, v) > 0 && strcmp(v, "0") == 0)
+		return USAGE_VOICE_CENTRIC;
+	return USAGE_DATA_CENTRIC;
+}
+
+/* One NAS pass: read-compare-write usage_preference, verify by re-read.
+ * Returns 0 = holds the wanted value (readback published), -1 = retry. */
+static int usage_pass(uint32_t want, int *wrote)
+{
+	qmi_client_type c = connect_svc(p_nas_get_service_object, "NAS");
+	uint32_t cur = 0;
+	char buf[16];
+	int rc = -1;
+
+	if (!c)
+		return -1;
+	if (get_u32(c, NAS_GET_SYS_SEL_PREF, NAS_USAGE_GET_TLV, &cur) == 0 &&
+	    cur == want) {
+		LOGI("nas.usage_preference already %u", want);
+		rc = 0;
+		goto out;
+	}
+	/* Only the usage TLV in the SET: the modem applies a partial sys-sel
+	 * request (proven with nas-probe `usage 2`), and sending the other
+	 * preferences back would risk re-asserting a stale mode/band mask. */
+	if (set_u32(c, NAS_SET_SYS_SEL_PREF, NAS_USAGE_SET_TLV, want))
+		goto out;
+	(*wrote)++;
+	if (get_u32(c, NAS_GET_SYS_SEL_PREF, NAS_USAGE_GET_TLV, &cur) || cur != want) {
+		LOGE("nas.usage_preference: wrote %u but readback disagrees", want);
+		goto out;
+	}
+	LOGI("nas.usage_preference: set to %u (verified)", want);
+	rc = 0;
+out:
+	p_client_release(c);
+	if (rc == 0) {
+		snprintf(buf, sizeof(buf), "%u", cur);
+		__system_property_set(USAGE_PROP, buf);
+	}
+	return rc;
+}
+
+static void usage_phase(void)
+{
+	time_t deadline = now_mono() + USAGE_BUDGET_S;
+	uint32_t want = wanted_usage();
+	int wrote = 0;
+
+	for (;;) {
+		if (usage_pass(want, &wrote) == 0) {
+			LOGI("usage: %s (%s, %d NV writes)",
+			     wrote ? "applied" : "already ok",
+			     want == USAGE_DATA_CENTRIC ? "data-centric"
+			                                : "voice-centric", wrote);
+			return;
+		}
+		if (now_mono() >= deadline) {
+			LOGE("usage: giving up after %ds", USAGE_BUDGET_S);
+			__system_property_set(USAGE_PROP, "failed");
+			return;
+		}
+		sleep(RETRY_SLEEP_S);
+	}
+}
+
 int main(void)
 {
 	time_t deadline = now_mono() + TOTAL_BUDGET_S;
@@ -708,6 +816,7 @@ int main(void)
 
 	if (!qmux_enabled()) {
 		__system_property_set(STATUS_PROP, "off");
+		__system_property_set(USAGE_PROP, "off");
 		return 0;
 	}
 	if (resolve_symbols()) {
@@ -734,6 +843,10 @@ int main(void)
 		sleep(RETRY_SLEEP_S);
 	}
 
+	/* NAS before the MSISDN wait: that one can legitimately sit for its
+	 * whole 180 s budget (no SIM), and the usage assert must not queue
+	 * behind it — it is the one the Settings row is watching. */
+	usage_phase();
 	msisdn_phase();
 	return 0;
 }

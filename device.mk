@@ -401,6 +401,17 @@ PRODUCT_PACKAGES += \
     ims_enabler \
     wfc_wlan_bridge \
     wfc_efswrite
+
+# Modem tweaks (Settings > System > Modem tweaks, LineageParts
+# ModemTweaksSettings): data-centric NAS usage_preference ON by default —
+# ims_enabler asserts usage=2 at boot (usage=1, stock voice-centric, when the
+# user turns the switch off). Bench 2026-10-14, matched A/B on new2: stops the
+# voice-not-available "Emergency calls only" stick when IMS blips on the home
+# cell (PLAN-emergency-only.md). Build-prop default for a persist prop, so the
+# user's own write wins afterwards; system_ext because gotweak_prop is
+# system-owned (see the gpu_perf_floor note in mithorium.mk).
+PRODUCT_SYSTEM_EXT_PROPERTIES += \
+    persist.gotweak.modem_data_centric=1
 # NOTE: libqmi_force_ipcr (the force-ipcr shim) is defined in mithorium-common
 # libshim/ and shipped via its gps_vendor_product.mk (the gnss service links
 # it; the qmux blobs carry it as a patched-in DT_NEEDED). Not duplicated here.

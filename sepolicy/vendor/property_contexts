@@ -4,3 +4,8 @@ persist.ov16885.		u:object_r:camera_prop:s0
 
 # Pepito keymaster version spoof (read by hal_keymaster_qti)
 ro.keymaster.xxx.		u:object_r:vendor_pepito_keymaster_prop:s0
+
+# Pepito modem-setting readbacks (ims_enabler -> Settings "Modem tweaks").
+# vendor.pepito.modem.usage = NAS usage_preference as verified after the boot
+# assert: 1 (voice-centric) | 2 (data-centric) | failed | off.
+vendor.pepito.modem.	u:object_r:vendor_pepito_modem_prop:s0

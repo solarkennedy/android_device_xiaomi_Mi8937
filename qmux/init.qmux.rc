@@ -93,7 +93,11 @@ service vendor.ims_rtp_daemon /vendor/bin/ims_rtp_daemon
 # never changes the ICCID). NV persists in modem EFS, so the steady-state run
 # is read-only (status props vendor.qmux.ims_enabler = ok,
 # vendor.qmux.ims_msisdn = kept); a fresh unit gets the writes applied
-# (= applied / set), and a changed number reads `updated`. Started at boot and
+# (= applied / set), and a changed number reads `updated`. Also asserts the
+# NAS usage_preference from the Settings "Modem tweaks" switch
+# (persist.gotweak.modem_data_centric, default on => data-centric 2, off =>
+# stock voice-centric 1) and publishes the verified readback in
+# vendor.pepito.modem.usage for that screen. Started at boot and
 # again when the user turns Wi-Fi calling on (see below — a gsm.sim.state
 # trigger is impossible from a vendor rc). Retries internally until the modem is up.
 service qmux_ims_enabler /vendor/bin/ims_enabler

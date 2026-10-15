@@ -1,3 +1,8 @@
 # Pepito: version props read by the property-spoofed stock QTI keymaster
 # wrapper during configure (see device.mk ro.keymaster.xxx.* block).
 vendor_internal_prop(vendor_pepito_keymaster_prop);
+
+# Pepito: modem-setting readbacks published by ims_enabler for the Settings
+# "Modem tweaks" screen (vendor.pepito.modem.*). Public, not internal: the
+# reader is system_app (coredomain), see qmux.te.
+vendor_public_prop(vendor_pepito_modem_prop);

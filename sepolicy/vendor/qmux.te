@@ -51,6 +51,20 @@ allow ims_enabler self:socket create_socket_perms;
 allowxperm ims_enabler self:socket ioctl msm_sock_ipc_ioctls;
 get_prop(ims_enabler, vendor_qmux_prop)
 set_prop(ims_enabler, vendor_qmux_prop)
+# Modem tweaks (Settings > System): the data-centric switch is a system-owned
+# persist.gotweak.* prop (gotweak_prop, mithorium-common property.te) that the
+# enabler reads at boot to pick the NAS usage_preference it asserts. Same
+# lesson as vendor_init next door in gotweaks.te: a public type still needs
+# an explicit get_prop per reader.
+get_prop(ims_enabler, gotweak_prop)
+# ...and it publishes the verified readback in vendor.pepito.modem.usage so the
+# Settings row can show applied / waiting-for-restart. That must be a
+# vendor_public_prop (property.te here): vendor.qmux.* is vendor_internal and
+# `neverallow coredomain vendor_internal_property_type:file read` means
+# system_app could never see it. LineageParts is system_app (seapp_contexts
+# user=system seinfo=platform), like the lifemode.te vendor_xiaomi_prop grant.
+set_prop(ims_enabler, vendor_pepito_modem_prop)
+get_prop(system_app, vendor_pepito_modem_prop)
 
 # No flip-script/su policy needed: qmux selection is static (kernel xprt
 # auto-enable on xiaomi,pepito + init.qmux.rc triggers keyed on the
