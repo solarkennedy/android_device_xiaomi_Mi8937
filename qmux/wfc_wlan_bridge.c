@@ -63,6 +63,10 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 #define STATUS_PROP     "vendor.qmux.wfc_bridge"
+/* Public mirror of the status (vendor_pepito_modem_prop) so the Modem tweaks
+ * screen (LineageParts, a coredomain app) can show the feeder state — it may
+ * never read the vendor-internal vendor.qmux.* status prop above. */
+#define PUBLIC_STATUS_PROP "vendor.pepito.modem.wfc"
 #define IFACE           "wlan0"
 /* Feeding is only needed to ESTABLISH IWLAN; once up, the modem self-maintains
  * the ePDG tunnel without further reports (proven live 2026-08-21: feeder killed
@@ -149,6 +153,7 @@ static void set_status(const char *s, const char **cur)
 {
 	if (*cur && strcmp(*cur, s) == 0) return;
 	__system_property_set(STATUS_PROP, s);
+	__system_property_set(PUBLIC_STATUS_PROP, s);
 	*cur = s;
 }
 

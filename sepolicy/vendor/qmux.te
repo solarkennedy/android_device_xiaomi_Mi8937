@@ -100,6 +100,9 @@ allow wfc_wlan_bridge self:socket create_socket_perms;
 allowxperm wfc_wlan_bridge self:socket ioctl msm_sock_ipc_ioctls;
 get_prop(wfc_wlan_bridge, vendor_qmux_prop)
 set_prop(wfc_wlan_bridge, vendor_qmux_prop)
+# Public mirror of the feeder status for the Modem tweaks screen (system_app
+# reads vendor.pepito.modem.wfc; it may not read the vendor-internal status above).
+set_prop(wfc_wlan_bridge, vendor_pepito_modem_prop)
 
 # Read wlan0 on an inet/udp socket. GIW* + SIOCGIFADDR are read-only queries
 # (no CAP_NET_ADMIN); scope the ioctl xperm to exactly what read_wlan() issues.
