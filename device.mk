@@ -23,6 +23,9 @@ endif
 # Boot animation
 TARGET_SCREEN_HEIGHT := 1280
 TARGET_SCREEN_WIDTH := 720
+# Continues from the splash logo; built by tools/splash/make-bootanimation.py
+# in the lineageos-pepito landing repo.
+TARGET_BOOTANIMATION := device/xiaomi/Mi8937/bootanimation/bootanimation.zip
 
 # Dynamic Partitions
 PRODUCT_USE_DYNAMIC_PARTITIONS := false
