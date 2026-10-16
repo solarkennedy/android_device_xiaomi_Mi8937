@@ -42,6 +42,8 @@ ifeq ($(PRODUCT_HARDWARE),Mi8917)
 TARGET_OTA_ASSERT_DEVICE := ugglite,rolex,riva,Mi8917
 else ifeq ($(PRODUCT_HARDWARE),Mi8937)
 TARGET_OTA_ASSERT_DEVICE := land,santoni,ugg,pepito,Mi8937
+# OTAs also write the boot logo (releasetools.py, splash/).
+TARGET_RELEASETOOLS_EXTENSIONS := $(DEVICE_PATH)
 endif
 
 # Camera
