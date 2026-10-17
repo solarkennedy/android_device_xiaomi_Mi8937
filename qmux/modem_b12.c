@@ -683,6 +683,23 @@ static void status(const char *s)
 }
 
 /*
+ * After a write has been saved: a restart is only needed if the modem now
+ * differs from what it booted with. Flipping on and back off (or off and back
+ * on) within one boot lands where it started.
+ */
+static const char *settled_status(int want)
+{
+	char boot[PROP_VALUE_MAX] = {0};
+	int boot_on;
+
+	__system_property_get(BOOT_PROP, boot);
+	boot_on = strcmp(boot, "1") == 0;
+	if (boot_on != want)
+		return "restart";
+	return want ? "active" : "inactive";
+}
+
+/*
  * One pass: bring the modem to `want`. Returns 1 if it wrote anything, 0 if
  * nothing needed writing (status already published), -1 on error (status
  * published).
@@ -851,7 +868,7 @@ int main(int argc, char **argv)
 		if (rc > 0) {
 			status("saving");
 			sleep(FLUSH_S);
-			status("restart");
+			status(settled_status(want));
 		}
 	} while (rc >= 0 && want != want_b12());
 
