@@ -1,0 +1,17 @@
+# modem_b12 — LTE Band 12 switch oneshot (qmux/init.modem_b12.rc). DCI/EFS2 and
+# diag NV read/write on /dev/diag, the same access as wfc_efswrite (qmux.te).
+type modem_b12, domain;
+type modem_b12_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(modem_b12)
+
+allow modem_b12 diag_device:chr_file rw_file_perms;
+
+# The shipped calibration items in /vendor/etc/modem_b12/.
+r_dir_file(modem_b12, vendor_configs_file)
+
+# The qmux gate, the Settings switch (system-owned gotweak_prop: a public type
+# still needs an explicit get_prop per reader), and the status it publishes
+# for Settings (vendor_pepito_modem_prop; system_app's read grant is in qmux.te).
+get_prop(modem_b12, vendor_qmux_prop)
+get_prop(modem_b12, gotweak_prop)
+set_prop(modem_b12, vendor_pepito_modem_prop)

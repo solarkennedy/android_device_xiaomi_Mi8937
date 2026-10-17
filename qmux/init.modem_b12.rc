@@ -1,0 +1,24 @@
+# LTE Band 12 switch (Settings > PVG100 Modem Tweaks, LineageParts
+# ModemTweaksSettings). modem_b12 brings the modem to the switch's state over
+# DCI on /dev/diag: creates the four B12 RF calibration items when absent and
+# sets/clears NV 6828 bit 11, then holds status "saving" while the modem syncs
+# EFS to flash (~3 min) before reporting "restart". Never touches a unit whose
+# modem was calibrated for B12 at the factory. Status in
+# vendor.pepito.modem.b12. See modem_b12.c and PLAN-android17.md (2026-10-16).
+#
+# The switch defaults to 0 (device.mk), so this also runs once per boot to
+# publish the state; with nothing to change that run is read-only.
+service qmux_modem_b12 /vendor/bin/modem_b12
+    class main
+    user root
+    # vendor_qti_diag owns /dev/diag; same DAC route as qmux_wfc_efswrite
+    # (no CAP_DAC_OVERRIDE in this domain).
+    group root vendor_qti_diag
+    oneshot
+    disabled
+
+# Fires at boot for the persisted value and again on every flip. A flip while
+# a run is still flushing is a no-op `start`; the run re-reads the switch when
+# it finishes and goes again.
+on property:persist.gotweak.modem_b12=* && property:ro.vendor.qmux.enable=1
+    start qmux_modem_b12

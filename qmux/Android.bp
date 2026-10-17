@@ -54,3 +54,61 @@ cc_binary {
     ],
     cflags: ["-Wall", "-Werror"],
 }
+
+// modem_b12 — [qmux, Modem Tweaks] LTE Band 12 switch. Writes the four B12 RF
+// calibration items (shipped below) and NV 6828 bit 11 over DCI on /dev/diag,
+// gated on persist.gotweak.modem_b12. Diag-only like wfc_efswrite, so no
+// libqmi_force_ipcr. See modem_b12.c.
+cc_binary {
+    name: "modem_b12",
+    srcs: ["modem_b12.c"],
+    vendor: true,
+    init_rc: ["init.modem_b12.rc"],
+    required: [
+        "modem_b12_rfnv_00022169",
+        "modem_b12_rfnv_00022170",
+        "modem_b12_rfnv_00024237",
+        "modem_b12_rfnv_00027790",
+    ],
+    shared_libs: [
+        "liblog",
+    ],
+    cflags: ["-Wall", "-Werror"],
+}
+
+// B12 RF calibration items, byte-for-byte from the factory `tunning` partition
+// (a plain tar of factory RF cal) of the one PVG100 seen with B12 enabled from
+// the factory. Calibration is per unit (every comparable item differs across
+// eight dumped units, by small amounts), so on any other phone these are close,
+// not exact. Installed to /vendor/etc/modem_b12/.
+prebuilt_etc {
+    name: "modem_b12_rfnv_00022169",
+    src: "b12/00022169",
+    filename: "00022169",
+    sub_dir: "modem_b12",
+    vendor: true,
+}
+
+prebuilt_etc {
+    name: "modem_b12_rfnv_00022170",
+    src: "b12/00022170",
+    filename: "00022170",
+    sub_dir: "modem_b12",
+    vendor: true,
+}
+
+prebuilt_etc {
+    name: "modem_b12_rfnv_00024237",
+    src: "b12/00024237",
+    filename: "00024237",
+    sub_dir: "modem_b12",
+    vendor: true,
+}
+
+prebuilt_etc {
+    name: "modem_b12_rfnv_00027790",
+    src: "b12/00027790",
+    filename: "00027790",
+    sub_dir: "modem_b12",
+    vendor: true,
+}

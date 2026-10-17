@@ -400,10 +400,13 @@ PRODUCT_COPY_FILES += \
 #   IWLAN/ePDG comes up for Wi-Fi calling; see PLAN-vowifi.md part 41)
 # + VoWiFi ps_sys field-4 EFS-write oneshot (toggle-gated; arms a fresh unit's
 #   modem for the ePDG tunnel; see PLAN-vowifi.md parts 44-47)
+# + LTE Band 12 switch oneshot (Modem tweaks; writes the B12 calibration items
+#   and NV 6828 bit 11 when the user turns it on; see qmux/modem_b12.c)
 PRODUCT_PACKAGES += \
     ims_enabler \
     wfc_wlan_bridge \
-    wfc_efswrite
+    wfc_efswrite \
+    modem_b12
 
 # Modem tweaks (Settings > System > Modem tweaks, LineageParts
 # ModemTweaksSettings): data-centric NAS usage_preference ON by default —
@@ -415,6 +418,11 @@ PRODUCT_PACKAGES += \
 # system-owned (see the gpu_perf_floor note in mithorium.mk).
 PRODUCT_SYSTEM_EXT_PROPERTIES += \
     persist.gotweak.modem_data_centric=1
+
+# Modem tweaks: LTE Band 12 switch, OFF by default (experimental: borrowed
+# calibration). modem_b12 still runs each boot, read-only, to publish its state.
+PRODUCT_SYSTEM_EXT_PROPERTIES += \
+    persist.gotweak.modem_b12=0
 # NOTE: libqmi_force_ipcr (the force-ipcr shim) is defined in mithorium-common
 # libshim/ and shipped via its gps_vendor_product.mk (the gnss service links
 # it; the qmux blobs carry it as a patched-in DT_NEEDED). Not duplicated here.
