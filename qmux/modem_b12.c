@@ -655,6 +655,27 @@ static int want_b12(void)
 	return strcmp(v, "1") == 0;
 }
 
+/*
+ * The DCI/EFS2 handshake answers before the modem serves NV: at boot (init
+ * starts this on the persist prop, ~14 s in) the first NV read came back
+ * not-DONE and the old code published "unsupported" for the whole boot,
+ * which also greys the switch out. Ready = NV 6828 reads DONE and carries the
+ * PVG100 base bands. Returns 1 when ready, 0 when not (yet), -1 on transport
+ * error.
+ */
+static int nv_ready(void)
+{
+	uint8_t nv[NV_ITEM_SIZE];
+	int st;
+
+	memset(nv, 0, sizeof(nv));
+	st = nv_cmd(DIAG_NV_READ_F, NV_LTE_BC_CONFIG, nv);
+	if (st < 0)
+		return -1;
+	return st == NV_DONE &&
+	       (le64(nv) & PVG100_LTE_BASE) == PVG100_LTE_BASE;
+}
+
 static void status(const char *s)
 {
 	__system_property_set(STATUS_PROP, s);
@@ -813,6 +834,12 @@ int main(int argc, char **argv)
 		}
 		sleep(RETRY_SLEEP_S);
 	}
+
+	/* Wait for the modem to serve NV before judging anything. A modem that
+	 * never gets there within the budget falls through to apply(), which
+	 * then reports what it finds (unsupported / failed). */
+	while (nv_ready() != 1 && time(NULL) - start <= TOTAL_BUDGET_S)
+		sleep(RETRY_SLEEP_S);
 
 	/* init `start`s this on every change of the switch, which is a no-op
 	 * while a run is still flushing; so re-read the switch after each pass
