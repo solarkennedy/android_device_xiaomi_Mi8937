@@ -107,9 +107,14 @@ public class WfcBridgeApp extends Application {
                     syncMode();
                 }
             };
+            // EXPORTED, not NOT_EXPORTED: the broadcast comes from
+            // com.android.phone (uid 1001), and a NOT_EXPORTED receiver only
+            // hears its own uid and system (1000), so it was skipped ("Exported
+            // Denial") and the boot-time mirror stayed at the pre-SIM stock
+            // value. Safe: CARRIER_CONFIG_CHANGED is a protected broadcast.
             registerReceiver(mCarrierConfigReceiver,
                     new IntentFilter(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED),
-                    Context.RECEIVER_NOT_EXPORTED);
+                    Context.RECEIVER_EXPORTED);
             syncMode();
         } catch (Throwable t) {
             Log.e(TAG, "mode init failed; Calling preference not mirrored", t);
