@@ -6,4 +6,10 @@
     <privapp-permissions package="org.lineageos.pepito.volumetile">
         <permission name="android.permission.STATUS_BAR"/>
     </privapp-permissions>
+    <!-- WfcBridge mirrors the per-subscription Wi-Fi-calling mode (siminfo
+         wfc_ims_mode via SubscriptionManager.getIntegerSubscriptionProperty),
+         which is gated on READ_PRIVILEGED_PHONE_STATE (signature|privileged). -->
+    <privapp-permissions package="org.lineageos.pepito.wfcbridge">
+        <permission name="android.permission.READ_PRIVILEGED_PHONE_STATE"/>
+    </privapp-permissions>
 </permissions>

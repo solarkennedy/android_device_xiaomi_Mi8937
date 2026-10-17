@@ -3,6 +3,9 @@
     package="org.lineageos.pepito.wfcbridge">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Reading the per-sub wfc_ims_mode (Calling preference); allowlisted in
+         permissions/privapp-permissions-pepito.xml (same commit, or bootloop). -->
+    <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE" />
 
     <!-- Persistent so the ContentObserver stays registered for the life of the
          boot; directBootAware so it runs (and the prop is kept in sync) before

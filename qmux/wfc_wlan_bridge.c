@@ -34,8 +34,30 @@
  *     edge can never fire) and at boot while WFC is off (see init.qmux.rc).
  * Whether the daemon runs at all is gated by
  * init on the user's Wi-Fi-calling toggle (see init.qmux.rc + WfcBridge, which
- * mirrors the Settings toggle to persist.sys.pepito.wfc_enabled). The IWLAN->VoLTE
- * handover on good LTE is separate and *correct* (part 41) and is NOT handled here.
+ * mirrors the Settings toggle to persist.sys.pepito.wfc_enabled).
+ *
+ * "Wi-Fi preferred" (memory wfc-wifi-preference-lane, bench 2026-10-15): the
+ * modem's in-call IWLAN->LTE rule is `Wifi < D && LTE > LTE2` (its own F3,
+ * qpDplHandOver.c:4291). Nothing on this stack ever arms the modem's WQE
+ * profile, so its Wi-Fi quality is permanently INVALID (= "< D") — the 0x3c
+ * RSSI we send below lands in ANDSF's "wqe profile type is inactive" bin —
+ * which leaves `LTE > LTE2 (-115)` as the only live term: every call that
+ * starts on Wi-Fi is handed to LTE ~1 s after answer wherever LTE is above
+ * -115 dBm. The lever is IMSS SET_HANDOVER_CONFIG (0x5d) LTE threshold 2
+ * (SET TLV 0x16, read back as GET 0x5e TLV 0x17): at -80 the call STAYS on
+ * Wi-Fi. But a static -80 also blocks the modem's `None->LTE` rescue, so a
+ * call drops ~20 s after Wi-Fi vanishes (WIFI_LOST, proven). Hence this
+ * daemon steers it dynamically, the way a stock AP-side CnE would:
+ *   TH2 = -80  while WFC is on, the user chose Wi-Fi preferred, wlan0 is
+ *              associated and its RSSI is decent;
+ *   TH2 = -115 (stock) the moment any of that stops being true.
+ * Proven: Wi-Fi dropped mid-call, TH2 restored 1 s later -> modem handed the
+ * call to LTE 5.4 s after the write, call survived. The down edge is the
+ * time-critical path (20 s media timeout), so while TH2 is held sticky wlan0
+ * is polled every STICKY_SEC (ioctls only, no QMI). The modem range-checks
+ * the value: anything above about -70 is silently ignored (result=0, readback
+ * unchanged), -80 is accepted. The store is EFS-backed, so a value left at
+ * -80 by a previous boot is put back to stock on the next start.
  *
  * Transport: QCCI on the nightly libqmi_cci, dlopen()ed (no import lib for the
  * vendor prebuilt); the ipc_router backend is forced by linking
@@ -92,6 +114,23 @@
 #define REPORT_RSSI            (-50)   /* strong. Handover is NOT RSSI-driven (part 41); */
                                        /* a plausible good value keeps the modem from roving. */
 
+/* IMSS (ims_settings, svc 0x12) handover config — the Wi-Fi-preferred lever. */
+#define IMSS_SET_HANDOVER_CONFIG 0x005d
+#define IMSS_GET_HANDOVER_CONFIG 0x005e
+#define IMSS_TH2_SET_TLV        0x16   /* SET 0x5d: LTE threshold 2, int32 dBm */
+#define IMSS_TH2_GET_TLV        0x17   /* GET 0x5e: same field (ids are SET+1) */
+#define TH2_STOCK               (-115) /* every unit we have read; also the fallback */
+#define TH2_STICKY              (-80)  /* highest value the modem accepts (-70+ rejected) */
+#define RSSI_HOLD               (-75)  /* arm sticky at/above this wlan0 RSSI ... */
+#define RSSI_RELEASE            (-82)  /* ... release below this (hysteresis) */
+#define RSSI_UNKNOWN            (-127)
+#define STICKY_SEC              2      /* wlan0 poll while TH2 is held sticky (no QMI) */
+/* The user's Settings "Calling preference", mirrored by WfcBridge into
+ * persist.sys.pepito.wfc_mode and by init.qmux.rc into this vendor prop.
+ * Values = ImsMmTelManager.WIFI_MODE_*: 0 wifi-only, 1 cellular-pref, 2 wifi-pref. */
+#define WFC_MODE_PROP           "vendor.qmux.wfc_mode"
+#define TH2_STATUS_PROP         "vendor.qmux.wfc_th2"   /* stock | sticky | error */
+
 typedef void *qmi_client_type;
 typedef void *qmi_idl_service_object_type;
 typedef void (*qmi_client_ind_cb)(qmi_client_type, unsigned int, void *,
@@ -104,6 +143,7 @@ static int (*p_send_raw)(qmi_client_type, unsigned int, void *, unsigned int,
                          void *, unsigned int, unsigned int *, unsigned int);
 static int (*p_release)(qmi_client_type);
 static qmi_idl_service_object_type (*p_dsd_get_so)(int, int, int);
+static qmi_idl_service_object_type (*p_imss_get_so)(int, int, int);
 
 static void ind_cb(qmi_client_type h, unsigned int m, void *b,
                    unsigned int l, void *c)
@@ -134,6 +174,16 @@ static int wfc_on(void)
 	return 0;
 }
 
+/* Wi-Fi preferred chosen by the user (wifi-only counts too). Unset = the
+ * carrier default = cellular preferred, i.e. stock behaviour. */
+static int wifi_preferred(void)
+{
+	char v[PROP_VALUE_MAX] = {0};
+	if (__system_property_get(WFC_MODE_PROP, v) > 0)
+		return strcmp(v, "2") == 0 || strcmp(v, "0") == 0;
+	return 0;
+}
+
 /* Block until the WFC toggle changes (zero wakeups) with a safety re-check
  * timeout. When WFC is off nothing can arm WLAN (only this feeder does, and
  * only when on), so once cleared there is nothing to watch — we just wait for
@@ -148,7 +198,14 @@ static void wait_wfc_change(int timeout_sec)
 	__system_property_wait(pi, serial, &serial, timeout_sec > 0 ? &ts : NULL);
 }
 
-/* Set STATUS_PROP only on change (avoids property-set spam each poll). */
+/* Set a status prop only on change (avoids property-set spam each poll). */
+static void set_status_prop(const char *prop, const char *s, const char **cur)
+{
+	if (*cur && strcmp(*cur, s) == 0) return;
+	__system_property_set(prop, s);
+	*cur = s;
+}
+
 static void set_status(const char *s, const char **cur)
 {
 	if (*cur && strcmp(*cur, s) == 0) return;
@@ -172,7 +229,10 @@ static int resolve_syms(void)
 	p_release = (int (*)(qmi_client_type)) dlsym(cci, "qmi_client_release");
 	p_dsd_get_so = (qmi_idl_service_object_type (*)(int, int, int))
 	               dlsym(svc, "dsd_get_service_object_internal_v01");
-	if (!p_init_instance || !p_send_raw || !p_release || !p_dsd_get_so) {
+	p_imss_get_so = (qmi_idl_service_object_type (*)(int, int, int))
+	                dlsym(svc, "imss_get_service_object_internal_v01");
+	if (!p_init_instance || !p_send_raw || !p_release || !p_dsd_get_so ||
+	    !p_imss_get_so) {
 		LOGE("dlsym failed: %s", dlerror());
 		return -1;
 	}
@@ -197,6 +257,7 @@ struct wlan_info {
 	uint16_t freq_mhz;
 	uint8_t  ip_le[4];   /* IPv4 as the modem wants it: little-endian of the u32 */
 	int      connected;
+	int      rssi;       /* dBm from SIOCGIWSTATS, RSSI_UNKNOWN if not reported */
 };
 
 static uint16_t iwfreq_to_mhz(const struct iw_freq *f)
@@ -216,6 +277,7 @@ static uint16_t iwfreq_to_mhz(const struct iw_freq *f)
 static int read_wlan(struct wlan_info *w)
 {
 	memset(w, 0, sizeof(*w));
+	w->rssi = RSSI_UNKNOWN;
 	int s = socket(AF_INET, SOCK_DGRAM, 0);
 	if (s < 0) return -1;
 
@@ -243,6 +305,20 @@ static int read_wlan(struct wlan_info *w)
 	strncpy(wrq.ifr_ifrn.ifrn_name, IFACE, IFNAMSIZ - 1);
 	if (ioctl(s, SIOCGIWFREQ, &wrq) == 0)
 		w->freq_mhz = iwfreq_to_mhz(&wrq.u.freq);
+
+	/* Link quality: with IW_QUAL_DBM the level byte is signed dBm (what
+	 * wcn/pronto reports); otherwise it is a driver-relative number we treat
+	 * as unknown rather than guess. */
+	struct iw_statistics st;
+	memset(&wrq, 0, sizeof(wrq));
+	memset(&st, 0, sizeof(st));
+	strncpy(wrq.ifr_ifrn.ifrn_name, IFACE, IFNAMSIZ - 1);
+	wrq.u.data.pointer = &st;
+	wrq.u.data.length = sizeof(st);
+	if (ioctl(s, SIOCGIWSTATS, &wrq) == 0 &&
+	    !(st.qual.updated & IW_QUAL_LEVEL_INVALID) &&
+	    (st.qual.updated & IW_QUAL_DBM))
+		w->rssi = (int8_t)st.qual.level;
 
 	struct ifreq ifr;
 	memset(&ifr, 0, sizeof(ifr));
@@ -365,6 +441,115 @@ static void send_wlan_meas(const struct wlan_info *w, uint32_t seq)
 	dsd_send(DSD_WLAN_MEAS_REQ, r, (unsigned)o);
 }
 
+/* ---- IMSS handover-config steering (LTE threshold 2) ---- */
+static qmi_client_type g_imss;
+static qmi_idl_service_object_type g_imss_so;
+static char g_imss_os[512];
+
+static int imss_connect(void)
+{
+	if (g_imss) return 0;
+	if (!g_imss_so)
+		for (int m = 0; m <= 300 && !g_imss_so; m++)
+			g_imss_so = p_imss_get_so(1, m, 6);
+	if (!g_imss_so) return -1;
+	memset(g_imss_os, 0, sizeof(g_imss_os));
+	if (p_init_instance(g_imss_so, QMI_CLIENT_INSTANCE_ANY, ind_cb, NULL,
+	                    g_imss_os, QMI_TIMEOUT_MS, &g_imss) || !g_imss) {
+		g_imss = NULL;
+		return -1;
+	}
+	return 0;
+}
+
+static void imss_drop(void)
+{
+	if (g_imss) p_release(g_imss);
+	g_imss = NULL;
+}
+
+/* GET 0x5e and pull one u32 TLV. 0 on success. */
+static int imss_get_u32(unsigned int msg, uint8_t tlv, uint32_t *val)
+{
+	uint8_t resp[2048];
+	unsigned int got = 0;
+	if (imss_connect()) return -1;
+	if (p_send_raw(g_imss, msg, NULL, 0, resp, sizeof(resp), &got,
+	               QMI_TIMEOUT_MS)) { imss_drop(); return -1; }
+	const uint8_t *p = resp, *e = resp + got;
+	while (p + 3 <= e) {
+		uint8_t t = p[0];
+		uint16_t l = (uint16_t)(p[1] | (p[2] << 8));
+		const uint8_t *v = p + 3;
+		if (v + l > e) break;
+		if (t == tlv && l == 4) {
+			*val = (uint32_t)v[0] | ((uint32_t)v[1] << 8) |
+			       ((uint32_t)v[2] << 16) | ((uint32_t)v[3] << 24);
+			return 0;
+		}
+		p = v + l;
+	}
+	return -1;
+}
+
+/* SET with one u32 TLV; returns the QMI result (0 = success) or -1. */
+static int imss_set_u32(unsigned int msg, uint8_t tlv, uint32_t val)
+{
+	uint8_t req[7] = { tlv, 4, 0, (uint8_t)val, (uint8_t)(val >> 8),
+	                   (uint8_t)(val >> 16), (uint8_t)(val >> 24) };
+	uint8_t resp[2048];
+	unsigned int got = 0;
+	if (imss_connect()) return -1;
+	if (p_send_raw(g_imss, msg, req, sizeof(req), resp, sizeof(resp), &got,
+	               QMI_TIMEOUT_MS)) { imss_drop(); return -1; }
+	const uint8_t *p = resp, *e = resp + got;
+	while (p + 3 <= e) {
+		uint8_t t = p[0];
+		uint16_t l = (uint16_t)(p[1] | (p[2] << 8));
+		const uint8_t *v = p + 3;
+		if (v + l > e) break;
+		if (t == 0x02 && l >= 4) return (v[0] | (v[1] << 8));
+		p = v + l;
+	}
+	return 0;
+}
+
+/* Assert LTE threshold 2 = `want` (dBm). Read-compare-write, read back, so
+ * the steady state costs one GET and a wrong/ignored write is visible. Keeps
+ * the last verified value so the normal poll sends nothing at all. */
+static int g_th2_known = 0;      /* 1 once g_th2 reflects the modem */
+static int g_th2;                /* last verified modem value */
+
+static void th2_assert(int want, const char **th2_status)
+{
+	uint32_t cur;
+	if (g_th2_known && g_th2 == want) return;
+	if (imss_get_u32(IMSS_GET_HANDOVER_CONFIG, IMSS_TH2_GET_TLV, &cur)) {
+		g_th2_known = 0;
+		set_status_prop(TH2_STATUS_PROP, "error", th2_status);
+		return;
+	}
+	if ((int32_t)cur != want) {
+		int rc = imss_set_u32(IMSS_SET_HANDOVER_CONFIG, IMSS_TH2_SET_TLV,
+		                      (uint32_t)(int32_t)want);
+		if (rc || imss_get_u32(IMSS_GET_HANDOVER_CONFIG, IMSS_TH2_GET_TLV, &cur)
+		    || (int32_t)cur != want) {
+			LOGE("LTE TH2 %d -> %d: rc=%d readback=%d", (int32_t)cur, want,
+			     rc, (int32_t)cur);
+			g_th2_known = 0;
+			set_status_prop(TH2_STATUS_PROP, "error", th2_status);
+			return;
+		}
+		LOGI("LTE TH2 -> %d (%s)", want,
+		     want == TH2_STICKY ? "Wi-Fi preferred, hold call on Wi-Fi"
+		                        : "stock, LTE rescue armed");
+	}
+	g_th2 = want;
+	g_th2_known = 1;
+	set_status_prop(TH2_STATUS_PROP, want == TH2_STICKY ? "sticky" : "stock",
+	                th2_status);
+}
+
 int main(int argc, char **argv)
 {
 	int down_mode = argc > 1 && strcmp(argv[1], "down") == 0;
@@ -415,6 +600,9 @@ int main(int argc, char **argv)
 
 	uint32_t seq = 1;
 	const char *status = NULL;           /* current STATUS_PROP value */
+	const char *th2_status = NULL;       /* current TH2_STATUS_PROP value */
+	int sticky = 0;                      /* LTE TH2 currently held at TH2_STICKY */
+	int rssi_warned = 0;
 
 	enum { ST_SEARCH, ST_PRIME, ST_UP } state = ST_SEARCH;
 	int prime_left = 0;                  /* feed cycles remaining in this prime */
@@ -450,8 +638,12 @@ int main(int argc, char **argv)
 			}
 			state = ST_SEARCH;
 			memset(cur_bssid, 0, 6);
+			/* WFC off = stock handover thresholds, always (also puts back a
+			 * sticky value a previous boot left in EFS). */
+			th2_assert(TH2_STOCK, &th2_status);
+			sticky = 0;
 			set_status("off", &status);
-			wait_wfc_change(wlan_reported ? 10 : 300);
+			wait_wfc_change((wlan_reported || !g_th2_known) ? 10 : 300);
 			continue;
 		}
 
@@ -464,6 +656,14 @@ int main(int argc, char **argv)
 				LOGI("wlan0 not associated; idle");
 			state = ST_SEARCH;
 			memset(cur_bssid, 0, 6);
+			/* Down edge, time-critical half: give the modem its LTE rescue
+			 * back BEFORE anything else. A call still up on the dead Wi-Fi
+			 * leg is dropped ~20 s after the loss unless TH2 is stock; the
+			 * modem hands it to LTE ~5 s after this write (proven). */
+			if (sticky) {
+				th2_assert(TH2_STOCK, &th2_status);
+				sticky = 0;
+			}
 			/* Down edge: the modem never ages WLAN-available out on its own,
 			 * and a stale entry sends cold IMS re-attach down the ~45 s
 			 * IWLAN-first path ("Emergency calls only" wedge). Clear it; keep
@@ -473,11 +673,27 @@ int main(int argc, char **argv)
 				LOGI("wlan0 down: sent WLAN_NOT_AVAILABLE");
 			}
 			set_status("searching", &status);
+			th2_assert(TH2_STOCK, &th2_status);   /* boot-time assert too */
 			sleep(FAST_SEC);
 			continue;
 		}
 
-		/* Associated. A new/changed BSSID means a fresh association to prime. */
+		/* Associated: steer LTE TH2. Sticky only for Wi-Fi preferred and a
+		 * decent link, with hysteresis so a wobbling RSSI does not flap the
+		 * modem; an unknown RSSI (driver not reporting dBm) never arms it. */
+		if (w.rssi == RSSI_UNKNOWN && wifi_preferred() && !rssi_warned) {
+			LOGE("wlan0 reports no dBm RSSI; Wi-Fi preferred cannot be held");
+			rssi_warned = 1;
+		}
+		int want_sticky = wifi_preferred() && w.rssi != RSSI_UNKNOWN &&
+		                  (sticky ? w.rssi >= RSSI_RELEASE : w.rssi >= RSSI_HOLD);
+		if (want_sticky != sticky)
+			LOGI("wlan0 rssi %d dBm, Wi-Fi preferred %d -> TH2 %s", w.rssi,
+			     wifi_preferred(), want_sticky ? "sticky" : "stock");
+		th2_assert(want_sticky ? TH2_STICKY : TH2_STOCK, &th2_status);
+		sticky = want_sticky && g_th2_known && g_th2 == TH2_STICKY;
+
+		/* A new/changed BSSID means a fresh association to prime. */
 		if (memcmp(cur_bssid, w.bssid, 6) != 0) {
 			memcpy(cur_bssid, w.bssid, 6);
 			state = ST_PRIME;
@@ -499,13 +715,20 @@ int main(int argc, char **argv)
 			nap = FAST_SEC;
 		} else { /* ST_UP: IWLAN self-maintains; just watch cheaply. */
 			set_status("up", &status);
-			up_elapsed += SLOW_SEC;
+			nap = SLOW_SEC;
+		}
+		/* While TH2 is sticky the wlan0 watch must be quick (ioctls only,
+		 * no QMI unless something changes): the Wi-Fi-loss edge has to reach
+		 * the modem well inside its ~20 s in-call media timeout. */
+		if (sticky && nap > STICKY_SEC)
+			nap = STICKY_SEC;
+		if (state == ST_UP) {
+			up_elapsed += nap;
 			if (up_elapsed >= REPRIME_SEC) {   /* periodic insurance re-prime */
 				up_elapsed = 0;
 				state = ST_PRIME;
 				prime_left = 3;
 			}
-			nap = SLOW_SEC;
 		}
 		sleep(nap);
 	}

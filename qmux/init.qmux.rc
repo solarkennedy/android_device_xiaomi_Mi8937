@@ -235,6 +235,15 @@ on property:persist.sys.pepito.wfc_enabled=1 && property:ro.vendor.qmux.enable=1
 # system/sepolicy/private/property.te:291 forbids vendor domains reading
 # radio_prop. The SIM-loaded re-run therefore rides the WFC-on trigger above.
 
+# Settings "Calling preference" (ImsMmTelManager.WIFI_MODE_*: 0 wifi-only,
+# 1 cellular-preferred, 2 wifi-preferred), mirrored by WfcBridge into
+# persist.sys.pepito.wfc_mode (a system prop the feeder may not read) and copied
+# here into the vendor prop it does read. The feeder steers the modem's in-call
+# IWLAN->LTE threshold on it so Wi-Fi preferred actually holds a call on Wi-Fi
+# while Wi-Fi is good, and hands it to LTE when Wi-Fi goes (wfc_wlan_bridge.c).
+on property:persist.sys.pepito.wfc_mode=*
+    setprop vendor.qmux.wfc_mode ${persist.sys.pepito.wfc_mode}
+
 on property:persist.sys.pepito.wfc_enabled=0
     # Feeder keeps running (it self-idles, blocking on vendor.qmux.wfc_on, and
     # clears WLAN itself); just tell it to stop feeding. qmux_wfc_down below is
