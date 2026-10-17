@@ -244,6 +244,13 @@ on property:persist.sys.pepito.wfc_enabled=1 && property:ro.vendor.qmux.enable=1
 on property:persist.sys.pepito.wfc_mode=*
     setprop vendor.qmux.wfc_mode ${persist.sys.pepito.wfc_mode}
 
+# Framework's "Wi-Fi network validated" verdict (ConnectivityManager
+# NET_CAPABILITY_VALIDATED), mirrored by WfcBridge into sys.pepito.wfc_wifi_ok
+# (not persisted: it is live state) and copied here for the feeder, which only
+# holds a call on Wi-Fi while the internet behind the AP actually works.
+on property:sys.pepito.wfc_wifi_ok=*
+    setprop vendor.qmux.wfc_wifi_ok ${sys.pepito.wfc_wifi_ok}
+
 on property:persist.sys.pepito.wfc_enabled=0
     # Feeder keeps running (it self-idles, blocking on vendor.qmux.wfc_on, and
     # clears WLAN itself); just tell it to stop feeding. qmux_wfc_down below is

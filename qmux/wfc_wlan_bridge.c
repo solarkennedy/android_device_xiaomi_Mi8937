@@ -49,7 +49,10 @@
  * call drops ~20 s after Wi-Fi vanishes (WIFI_LOST, proven). Hence this
  * daemon steers it dynamically, the way a stock AP-side CnE would:
  *   TH2 = -80  while WFC is on, the user chose Wi-Fi preferred, wlan0 is
- *              associated and its RSSI is decent;
+ *              associated, its RSSI is decent AND the framework has validated
+ *              the Wi-Fi network (vendor.qmux.wfc_wifi_ok, mirrored by
+ *              WfcBridge from ConnectivityManager NET_CAPABILITY_VALIDATED) —
+ *              an AP whose uplink is dead must not hold the LTE rescue off;
  *   TH2 = -115 (stock) the moment any of that stops being true.
  * Proven: Wi-Fi dropped mid-call, TH2 restored 1 s later -> modem handed the
  * call to LTE 5.4 s after the write, call survived. The down edge is the
@@ -129,6 +132,11 @@
  * persist.sys.pepito.wfc_mode and by init.qmux.rc into this vendor prop.
  * Values = ImsMmTelManager.WIFI_MODE_*: 0 wifi-only, 1 cellular-pref, 2 wifi-pref. */
 #define WFC_MODE_PROP           "vendor.qmux.wfc_mode"
+/* Framework's verdict on the Wi-Fi network (ConnectivityManager VALIDATED),
+ * mirrored by WfcBridge into sys.pepito.wfc_wifi_ok and by init.qmux.rc into
+ * this vendor prop. Association + RSSI say the LINK is fine; this says the
+ * internet behind it is. Unset = not ok (a dead mirror degrades to stock). */
+#define WFC_WIFI_OK_PROP        "vendor.qmux.wfc_wifi_ok"
 #define TH2_STATUS_PROP         "vendor.qmux.wfc_th2"   /* stock | sticky | error */
 
 typedef void *qmi_client_type;
@@ -181,6 +189,14 @@ static int wifi_preferred(void)
 	char v[PROP_VALUE_MAX] = {0};
 	if (__system_property_get(WFC_MODE_PROP, v) > 0)
 		return strcmp(v, "2") == 0 || strcmp(v, "0") == 0;
+	return 0;
+}
+
+static int wifi_ok(void)
+{
+	char v[PROP_VALUE_MAX] = {0};
+	if (__system_property_get(WFC_WIFI_OK_PROP, v) > 0)
+		return strcmp(v, "1") == 0;
 	return 0;
 }
 
@@ -339,6 +355,12 @@ static int read_wlan(struct wlan_info *w)
 /* ---- DSD sends ---- */
 static qmi_client_type g_c;
 
+/* LTE threshold 2 cache (see th2_assert): 1 once g_th2 reflects the modem. A
+ * DSD transport error is our tell for a modem restart, after which the modem
+ * may hold whatever EFS last flushed rather than what we last wrote. */
+static int g_th2_known = 0;
+static int g_th2;
+
 /* Returns QMI result (0 = success), or a negative transport error. */
 static int dsd_send(unsigned int msg, uint8_t *req, unsigned int len)
 {
@@ -346,7 +368,7 @@ static int dsd_send(unsigned int msg, uint8_t *req, unsigned int len)
 	unsigned int got = 0;
 	int rc = p_send_raw(g_c, msg, req, len, resp, sizeof(resp), &got,
 	                    QMI_TIMEOUT_MS);
-	if (rc) return -1;
+	if (rc) { g_th2_known = 0; return -1; }
 	const uint8_t *p = resp, *e = resp + got;
 	while (p + 3 <= e) {
 		uint8_t t = p[0];
@@ -515,27 +537,34 @@ static int imss_set_u32(unsigned int msg, uint8_t tlv, uint32_t val)
 }
 
 /* Assert LTE threshold 2 = `want` (dBm). Read-compare-write, read back, so
- * the steady state costs one GET and a wrong/ignored write is visible. Keeps
- * the last verified value so the normal poll sends nothing at all. */
-static int g_th2_known = 0;      /* 1 once g_th2 reflects the modem */
-static int g_th2;                /* last verified modem value */
-
+ * a wrong/ignored write is visible. Keeps the last verified value so the
+ * normal poll sends nothing at all, and a known-but-different value goes
+ * straight to SET (the Wi-Fi-loss down edge is time-critical: one round trip
+ * fewer inside the modem's ~20 s media timeout). The cache is dropped on any
+ * DSD transport error and once per re-prime period (main loop), so a modem
+ * restart or an unflushed EFS write cannot leave a stale belief for the boot. */
 static void th2_assert(int want, const char **th2_status)
 {
 	uint32_t cur;
+	int from;
 	if (g_th2_known && g_th2 == want) return;
-	if (imss_get_u32(IMSS_GET_HANDOVER_CONFIG, IMSS_TH2_GET_TLV, &cur)) {
-		g_th2_known = 0;
-		set_status_prop(TH2_STATUS_PROP, "error", th2_status);
-		return;
+	if (g_th2_known) {
+		from = g_th2;
+		cur = (uint32_t)(int32_t)from;
+	} else {
+		if (imss_get_u32(IMSS_GET_HANDOVER_CONFIG, IMSS_TH2_GET_TLV, &cur)) {
+			set_status_prop(TH2_STATUS_PROP, "error", th2_status);
+			return;
+		}
+		from = (int32_t)cur;
 	}
 	if ((int32_t)cur != want) {
 		int rc = imss_set_u32(IMSS_SET_HANDOVER_CONFIG, IMSS_TH2_SET_TLV,
 		                      (uint32_t)(int32_t)want);
 		if (rc || imss_get_u32(IMSS_GET_HANDOVER_CONFIG, IMSS_TH2_GET_TLV, &cur)
 		    || (int32_t)cur != want) {
-			LOGE("LTE TH2 %d -> %d: rc=%d readback=%d", (int32_t)cur, want,
-			     rc, (int32_t)cur);
+			LOGE("LTE TH2 %d -> %d: rc=%d readback=%d", from, want, rc,
+			     (int32_t)cur);
 			g_th2_known = 0;
 			set_status_prop(TH2_STATUS_PROP, "error", th2_status);
 			return;
@@ -660,10 +689,8 @@ int main(int argc, char **argv)
 			 * back BEFORE anything else. A call still up on the dead Wi-Fi
 			 * leg is dropped ~20 s after the loss unless TH2 is stock; the
 			 * modem hands it to LTE ~5 s after this write (proven). */
-			if (sticky) {
-				th2_assert(TH2_STOCK, &th2_status);
-				sticky = 0;
-			}
+			th2_assert(TH2_STOCK, &th2_status);   /* boot-time assert too */
+			sticky = 0;
 			/* Down edge: the modem never ages WLAN-available out on its own,
 			 * and a stale entry sends cold IMS re-attach down the ~45 s
 			 * IWLAN-first path ("Emergency calls only" wedge). Clear it; keep
@@ -673,23 +700,26 @@ int main(int argc, char **argv)
 				LOGI("wlan0 down: sent WLAN_NOT_AVAILABLE");
 			}
 			set_status("searching", &status);
-			th2_assert(TH2_STOCK, &th2_status);   /* boot-time assert too */
 			sleep(FAST_SEC);
 			continue;
 		}
 
-		/* Associated: steer LTE TH2. Sticky only for Wi-Fi preferred and a
-		 * decent link, with hysteresis so a wobbling RSSI does not flap the
+		/* Associated: steer LTE TH2. Sticky only for Wi-Fi preferred, a
+		 * decent link AND a framework-validated Wi-Fi network (an AP with a
+		 * dead uplink looks perfect from here but must not hold the LTE
+		 * rescue off), with hysteresis so a wobbling RSSI does not flap the
 		 * modem; an unknown RSSI (driver not reporting dBm) never arms it. */
-		if (w.rssi == RSSI_UNKNOWN && wifi_preferred() && !rssi_warned) {
+		int pref = wifi_preferred();
+		int ok = wifi_ok();
+		if (w.rssi == RSSI_UNKNOWN && pref && !rssi_warned) {
 			LOGE("wlan0 reports no dBm RSSI; Wi-Fi preferred cannot be held");
 			rssi_warned = 1;
 		}
-		int want_sticky = wifi_preferred() && w.rssi != RSSI_UNKNOWN &&
+		int want_sticky = pref && ok && w.rssi != RSSI_UNKNOWN &&
 		                  (sticky ? w.rssi >= RSSI_RELEASE : w.rssi >= RSSI_HOLD);
 		if (want_sticky != sticky)
-			LOGI("wlan0 rssi %d dBm, Wi-Fi preferred %d -> TH2 %s", w.rssi,
-			     wifi_preferred(), want_sticky ? "sticky" : "stock");
+			LOGI("wlan0 rssi %d dBm, Wi-Fi preferred %d, validated %d -> TH2 %s",
+			     w.rssi, pref, ok, want_sticky ? "sticky" : "stock");
 		th2_assert(want_sticky ? TH2_STICKY : TH2_STOCK, &th2_status);
 		sticky = want_sticky && g_th2_known && g_th2 == TH2_STICKY;
 
@@ -719,15 +749,18 @@ int main(int argc, char **argv)
 		}
 		/* While TH2 is sticky the wlan0 watch must be quick (ioctls only,
 		 * no QMI unless something changes): the Wi-Fi-loss edge has to reach
-		 * the modem well inside its ~20 s in-call media timeout. */
-		if (sticky && nap > STICKY_SEC)
-			nap = STICKY_SEC;
+		 * the modem well inside its ~20 s in-call media timeout. Only once
+		 * primed: PRIME_CYCLES counts loop turns, so clamping during a prime
+		 * would cut the ~75 s feed to ~50 s and send every 2 s. */
 		if (state == ST_UP) {
+			if (sticky && nap > STICKY_SEC)
+				nap = STICKY_SEC;
 			up_elapsed += nap;
 			if (up_elapsed >= REPRIME_SEC) {   /* periodic insurance re-prime */
 				up_elapsed = 0;
 				state = ST_PRIME;
 				prime_left = 3;
+				g_th2_known = 0;   /* and re-read TH2 from the modem */
 			}
 		}
 		sleep(nap);
