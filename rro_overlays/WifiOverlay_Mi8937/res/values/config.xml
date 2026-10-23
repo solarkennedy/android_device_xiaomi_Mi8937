@@ -14,4 +14,10 @@
          wifi/software_pno_enabled, which the "Reconnect to Wi-Fi with screen
          off" switch in LineageParts sets; off by default for battery. -->
     <bool translatable="false" name="config_wifiSwPnoEnabled">true</bool>
+    <!-- mithorium-common turns this on; on userdebug builds it lets Wi-Fi
+         faults (Pronto subsystem restart, HAL errors, last-resort watchdog)
+         start a full system bug report on their own, up to once an hour.
+         That is minutes of heavy CPU on this SoC and an unexpected bug-report
+         notification on a daily-driver release build. Keep the AOSP default. -->
+    <bool translatable="false" name="config_wifi_diagnostics_bugreport_enabled">false</bool>
 </resources>
