@@ -342,6 +342,7 @@ PRODUCT_SOONG_NAMESPACES += \
 # Wifi
 ifeq ($(PRODUCT_HARDWARE),Mi8937)
 PRODUCT_PACKAGES += \
+    WifiOverlay_Mi8937 \
     WifiOverlay_prada
 endif
 

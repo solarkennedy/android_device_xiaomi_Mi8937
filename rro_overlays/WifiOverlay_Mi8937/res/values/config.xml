@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2026 The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <!-- Pronto (prima) accepts NL80211 sched scans but its firmware never
+         reports a match, so hardware PNO leaves a disconnected phone off Wi-Fi
+         until the screen turns on. Keep it off; the framework then falls back
+         to software PNO when that is enabled. -->
+    <bool translatable="false" name="config_wifi_background_scan_support">false</bool>
+    <!-- Allow software PNO (periodic wake-up scans while disconnected with the
+         screen off). It also needs the DeviceConfig flag
+         wifi/software_pno_enabled, which the "Reconnect to Wi-Fi with screen
+         off" switch in LineageParts sets; off by default for battery. -->
+    <bool translatable="false" name="config_wifiSwPnoEnabled">true</bool>
+</resources>

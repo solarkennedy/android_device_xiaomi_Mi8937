@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2026 The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<!-- Mi8937-group wifi overlays, layered over mithorium-common WifiOverlay -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.android.wifi.resources.xiaomi_msm8937"
+    android:versionCode="1"
+    android:versionName="1.0">
+    <application android:hasCode="false" />
+    <overlay
+      android:targetPackage="com.android.wifi.resources"
+      android:targetName="WifiCustomization"
+      android:isStatic="true"
+      android:priority="1"/>
+</manifest>
