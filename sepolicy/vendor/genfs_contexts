@@ -15,6 +15,8 @@ genfscon sysfs /devices/platform/soc/78b6000.i2c/i2c-2/2-0045/leds		u:object_r:s
 genfscon sysfs /devices/platform/soc/7af5000.i2c/i2c-5/5-0045/leds		u:object_r:sysfs_leds:s0
 genfscon sysfs /devices/platform/soc/soc:flashlight/leds/flashlight		u:object_r:sysfs_leds:s0
 genfscon sysfs /devices/platform/soc/soc:flashlight-front/leds/flashlight-front	u:object_r:sysfs_leds:s0
+# pepito notification LED (PMI8950 MPP2): sysfs_graphics so hal_light can write it
+genfscon sysfs /devices/platform/soc/200f000.qcom,spmi/spmi-0/spmi0-02/200f000.qcom,spmi:qcom,pmi8950@2:qcom,leds@a100/leds	u:object_r:sysfs_graphics:s0
 
 # Mach
 genfscon sysfs /xiaomi-msm8937-mach	u:object_r:sysfs_mi8937_mach:s0

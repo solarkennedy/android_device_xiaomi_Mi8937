@@ -17,4 +17,10 @@
 <resources>
     <!-- pepito has no physical navigation or volume hardware keys -->
     <integer name="config_deviceHardwareKeys">0</integer>
+
+    <!-- One white LED (PMI8950 MPP2), driven as the notification LED. It is a
+         plain current sink in manual mode: no colour, no hardware blink (the
+         HAL shows a pulse as solid), only 5/10 mA. No battery bit, so it does
+         not light while charging. -->
+    <integer name="config_deviceLightCapabilities">0</integer>
 </resources>
