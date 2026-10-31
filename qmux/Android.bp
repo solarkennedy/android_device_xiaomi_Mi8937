@@ -112,3 +112,18 @@ prebuilt_etc {
     sub_dir: "modem_b12",
     vendor: true,
 }
+
+// modem_evs — [qmux, Modem Tweaks] caps VoLTE EVS at wideband: byte 9 of the
+// modem EFS item qipcall_evs_codec_config, unless persist.gotweak.modem_evs_swb
+// allows super-wideband (an EVS-SWB session that starts with a voice cal
+// registered crashes the ADSP). Diag-only like modem_b12. See modem_evs.c.
+cc_binary {
+    name: "modem_evs",
+    srcs: ["modem_evs.c"],
+    vendor: true,
+    init_rc: ["init.modem_evs.rc"],
+    shared_libs: [
+        "liblog",
+    ],
+    cflags: ["-Wall", "-Werror"],
+}

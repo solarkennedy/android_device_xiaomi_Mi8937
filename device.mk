@@ -403,11 +403,14 @@ PRODUCT_COPY_FILES += \
 #   modem for the ePDG tunnel; see PLAN-vowifi.md parts 44-47)
 # + LTE Band 12 switch oneshot (Modem tweaks; writes the B12 calibration items
 #   and NV 6828 bit 11 when the user turns it on; see qmux/modem_b12.c)
+# + EVS bandwidth oneshot (Modem tweaks; caps VoLTE EVS at wideband unless the
+#   user allows super-wideband, which crashes the ADSP; see qmux/modem_evs.c)
 PRODUCT_PACKAGES += \
     ims_enabler \
     wfc_wlan_bridge \
     wfc_efswrite \
-    modem_b12
+    modem_b12 \
+    modem_evs
 
 # Modem tweaks (Settings > System > Modem tweaks, LineageParts
 # ModemTweaksSettings): data-centric NAS usage_preference ON by default —
@@ -424,6 +427,13 @@ PRODUCT_SYSTEM_EXT_PROPERTIES += \
 # calibration). modem_b12 still runs each boot, read-only, to publish its state.
 PRODUCT_SYSTEM_EXT_PROPERTIES += \
     persist.gotweak.modem_b12=0
+
+# Modem tweaks: EVS super-wideband, OFF by default = EVS capped at wideband. An
+# EVS-SWB VoLTE call that starts with a voice calibration registered crashes
+# the ADSP and the modem; T-Mobile's profile asks for SWB (bench, dut1 + new2,
+# 2026-10-31; PLAN-android17.md "Bug 2026-10-30"). modem_evs runs each boot.
+PRODUCT_SYSTEM_EXT_PROPERTIES += \
+    persist.gotweak.modem_evs_swb=0
 # NOTE: libqmi_force_ipcr (the force-ipcr shim) is defined in mithorium-common
 # libshim/ and shipped via its gps_vendor_product.mk (the gnss service links
 # it; the qmux blobs carry it as a patched-in DT_NEEDED). Not duplicated here.

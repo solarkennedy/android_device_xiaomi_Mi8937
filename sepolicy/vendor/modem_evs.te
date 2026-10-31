@@ -1,0 +1,14 @@
+# modem_evs — EVS super-wideband switch oneshot (qmux/init.modem_evs.rc). DCI/EFS2
+# on /dev/diag, the same access as modem_b12.
+type modem_evs, domain;
+type modem_evs_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(modem_evs)
+
+allow modem_evs diag_device:chr_file rw_file_perms;
+
+# The qmux gate, the Settings switch (system-owned gotweak_prop: a public type
+# still needs an explicit get_prop per reader), and the status it publishes
+# for Settings (vendor_pepito_modem_prop; system_app's read grant is in qmux.te).
+get_prop(modem_evs, vendor_qmux_prop)
+get_prop(modem_evs, gotweak_prop)
+set_prop(modem_evs, vendor_pepito_modem_prop)

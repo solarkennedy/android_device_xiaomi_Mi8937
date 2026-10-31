@@ -1,0 +1,30 @@
+# EVS super-wideband switch (Settings > PVG100 Modem Tweaks, LineageParts
+# ModemTweaksSettings). modem_evs caps the VoLTE EVS bandwidth at wideband in
+# the modem EFS item /nv/item_files/ims/qipcall_evs_codec_config (byte 9) over
+# DCI on /dev/diag, unless the switch allows super-wideband: an EVS-SWB call
+# that starts with a voice calibration registered crashes the ADSP and the
+# modem (T-Mobile asks for SWB; PLAN-android17.md, "Bug 2026-10-30"). Only a
+# profile that asks for more than wideband is touched. Status in
+# vendor.pepito.modem.evs. See modem_evs.c.
+#
+# The switch defaults to 0 (device.mk), so this runs once per boot to cap a
+# freshly provisioned profile and to publish the state; once capped the run is
+# read-only.
+service qmux_modem_evs /vendor/bin/modem_evs
+    class main
+    user root
+    # vendor_qti_diag owns /dev/diag; same DAC route as qmux_modem_b12.
+    group root vendor_qti_diag
+    oneshot
+    disabled
+
+# Fires at boot for the persisted value and again on every flip. A flip while
+# a run is still flushing is a no-op `start`; the run re-reads the switch when
+# it finishes and goes again.
+on property:persist.gotweak.modem_evs_swb=* && property:ro.vendor.qmux.enable=1
+    start qmux_modem_evs
+
+# A new SIM can make the modem load another carrier profile, which rewrites the
+# EVS item: look again once the SIM is up.
+on property:gsm.sim.state=LOADED && property:ro.vendor.qmux.enable=1
+    start qmux_modem_evs
