@@ -77,6 +77,7 @@ PRODUCT_PACKAGES += \
     VolumeTile \
     WfcBridge \
     xiaomi_pepito_overlay \
+    xiaomi_pepito_overlay_settingsprovider \
     xiaomi_pepito_overlay_systemui
 
 # Allowlist VolumeTile's signature|privileged STATUS_BAR permission (see the xml).

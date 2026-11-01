@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <!-- Settings > Location > "Use assisted GPS" on by default, as on the stock
+         Palm PVG100 software (LineageOS ships it off). It gates SUPL and the
+         XTRA download for the GNSS HAL (mithorium-common GnssXtra). Applies when
+         the settings database is created, i.e. a fresh install or wipe. -->
+    <bool name="assisted_gps_enabled">true</bool>
+</resources>
