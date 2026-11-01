@@ -32,7 +32,8 @@
  * the AP side writes it on this ROM (no entitlement app; the qcril ims module
  * is v02-only). The number is learnable from the modem itself: once IMS has
  * registered on LTE, IMSA GET_REGISTRATION_STATUS (0x20) TLV 0x15 carries the
- * P-Associated-URI list incl. "tel:+1XXXXXXXXXX". We copy the digits into
+ * P-Associated-URI list incl. "tel:+1XXXXXXXXXX" (or, on T-Mobile, which has
+ * no tel: entry, "sip:+1XXXXXXXXXX@..."). We copy the digits into
  * IMSS SET 0x53 TLV 0x18 (stock's encoding: ASCII, no '+', no NUL). Verified
  * live 2026-08-24: one such write -> voice FULL_SERVICE over WLAN in 10 s and
  * a real Wi-Fi call; persists in EFS across reboots.
@@ -526,9 +527,42 @@ static int set_msisdn(qmi_client_type c, const char *digits)
 	return 0;
 }
 
-/* Ask IMSA for the registration URI list and pull the digits out of the
- * tel: entry. Returns 1 = digits filled, 0 = not registered / no tel URI yet,
- * -1 = IMSA unreachable. */
+/* Copy the digits of a URI's number part into out[]: "tel:+1...", or the user
+ * part of "sip:+1...@host". Returns the digit count; 0 if the URI does not
+ * carry a number in that form. */
+static size_t uri_number_digits(const uint8_t *str, unsigned int l,
+                                char *out, size_t outsz)
+{
+	unsigned int k, stop = l;
+	size_t o = 0;
+
+	if (l > 4 && memcmp(str, "tel:", 4) == 0) {
+		k = 4;
+	} else if (l > 5 && memcmp(str, "sip:+", 5) == 0) {
+		/* Only a '+'-prefixed (E.164) sip user, up to the '@'. A bare
+		 * digit user is not safe: T-Mobile also registers
+		 * sip:<IMSI>@ims.mnc..., which is 15 digits of not-a-number. */
+		k = 5;
+		for (stop = k; stop < l && str[stop] != '@'; stop++)
+			if (str[stop] < '0' || str[stop] > '9')
+				return 0;
+		if (stop == l)
+			return 0;
+	} else {
+		return 0;
+	}
+	for (; k < stop && o + 1 < outsz; k++)
+		if (str[k] >= '0' && str[k] <= '9')
+			out[o++] = (char)str[k];
+	out[o] = '\0';
+	return o;
+}
+
+/* Ask IMSA for the registration URI list and pull the line's number out of
+ * it: the tel: entry when there is one, else the first sip:+<E.164>@ entry
+ * (T-Mobile's list has no tel: URI at all, only sip: ones — dut1 2026-10-31,
+ * PLAN-android17.md). Returns 1 = digits filled, 0 = not registered / no
+ * number URI yet, -1 = IMSA unreachable. */
 static int imsa_tel_digits(char *out, size_t outsz)
 {
 	qmi_client_type c = connect_svc(p_imsa_get_service_object, "IMSA");
@@ -552,27 +586,26 @@ static int imsa_tel_digits(char *out, size_t outsz)
 	if (!v || vlen < 2)
 		return 0;
 	count = v[0];
-	p = v + 1;
 	end = v + vlen;
-	for (unsigned int i = 0; i < count && p < end; i++) {
-		unsigned int l = p[0];
-		const uint8_t *str = p + 1;
+	/* Pass 0 takes only tel:, pass 1 the sip:+ fallback, so a tel: entry
+	 * wins wherever it sits in the list. */
+	for (int pass_no = 0; pass_no < 2 && rc == 0; pass_no++) {
+		p = v + 1;
+		for (unsigned int i = 0; i < count && p < end; i++) {
+			unsigned int l = p[0];
+			const uint8_t *str = p + 1;
+			int is_tel;
 
-		if (str + l > end)
-			break;
-		if (l > 4 && memcmp(str, "tel:", 4) == 0) {
-			size_t o = 0;
-
-			for (unsigned int k = 4; k < l && o + 1 < outsz; k++)
-				if (str[k] >= '0' && str[k] <= '9')
-					out[o++] = (char)str[k];
-			out[o] = '\0';
-			if (o >= MSISDN_MIN_DIGITS) {   /* sanity: a real subscriber number */
-				rc = 1;
+			if (str + l > end)
+				break;
+			is_tel = l > 4 && memcmp(str, "tel:", 4) == 0;
+			if (is_tel == (pass_no == 0) &&
+			    uri_number_digits(str, l, out, outsz) >= MSISDN_MIN_DIGITS) {
+				rc = 1;   /* sanity: a real subscriber number */
 				break;
 			}
+			p = str + l;
 		}
-		p = str + l;
 	}
 	return rc;
 }
