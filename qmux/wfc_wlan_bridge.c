@@ -97,6 +97,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <linux/if.h>
@@ -188,6 +190,8 @@ static qmi_idl_service_object_type (*p_imss_get_so)(int, int, int);
  * main loop (no sync QMI sends from the callback). g_wqe_req = profiles the
  * modem has asked for; g_wqe_new = asked for since the last reply. */
 static _Atomic uint32_t g_wqe_req, g_wqe_new;
+static void wqe_remember(uint32_t req);
+static void wqe_seed(void);
 static _Atomic int g_wqe_thr[WQE_MAX_PROF];   /* 0 = no threshold given */
 static int g_wake[2] = { -1, -1 };            /* ind_cb -> main loop nudge */
 
@@ -223,6 +227,7 @@ static void ind_cb(qmi_client_type h, unsigned int m, void *b,
 		atomic_store(&g_wqe_thr[prof], thr);
 		atomic_fetch_or(&g_wqe_req, 1u << prof);
 		atomic_fetch_or(&g_wqe_new, 1u << prof);
+		wqe_remember(atomic_load(&g_wqe_req));
 	} else if (m == DSD_WQE_MASK_IND && mask_seen && mask_zero) {
 		atomic_store(&g_wqe_req, 0);   /* the modem withdrew every request */
 		atomic_store(&g_wqe_new, 0);
@@ -583,11 +588,50 @@ static void send_wqe_status(uint32_t prof, uint32_t status)
  * want_met says so for that profile. Sends only on change, or for a profile the
  * modem has just asked for (it waits ~10 s for an answer). */
 static uint32_t g_wqe_met;   /* profiles last reported met */
+static time_t g_wqe_sent_at;  /* last full re-send (monotonic) */
+
+/* Stock CnE re-sends its verdict for every known profile every ~10 s. The
+ * modem keeps the LAST verdict it heard and never asks again on its own; a
+ * "not met" it processed just before a Wi-Fi loss (the down edge used to send
+ * both, ms apart) outlived the reconnect, and IMS then sat on LTE for good
+ * with the per-APN table still listing IWLAN (bench 2026-11-01: a single
+ * re-sent "met" brought it back in 10 s). So repeat the current verdict. */
+#define WQE_REFRESH_SEC 10
+/* The profile set the modem asked for, kept across daemon restarts: with
+ * WLAN already reported the modem does not ask again, and a restarted bridge
+ * would then have nothing to repeat. */
+#define WQE_PROF_PROP "vendor.qmux.wfc_wqe_prof"
+
+static void wqe_remember(uint32_t req)
+{
+	char v[16];
+	snprintf(v, sizeof(v), "%x", req);
+	__system_property_set(WQE_PROF_PROP, v);
+}
+
+static void wqe_seed(void)
+{
+	char v[PROP_VALUE_MAX] = "";
+	if (__system_property_get(WQE_PROF_PROP, v) <= 0)
+		return;
+	uint32_t req = (uint32_t)strtoul(v, NULL, 16);
+	if (!req || atomic_load(&g_wqe_req))
+		return;
+	atomic_store(&g_wqe_req, req);
+	atomic_fetch_or(&g_wqe_new, req);
+	LOGI("WQE profiles seeded from last run: 0x%x", req);
+}
 
 static void wqe_report(int usable, int rssi)
 {
 	uint32_t req = atomic_load(&g_wqe_req);
 	uint32_t fresh = atomic_exchange(&g_wqe_new, 0);
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	if (ts.tv_sec - g_wqe_sent_at >= WQE_REFRESH_SEC) {
+		fresh |= req;
+		g_wqe_sent_at = ts.tv_sec;
+	}
 
 	g_wqe_met &= req;   /* a withdrawn profile starts over */
 	for (uint32_t p = 0; p < WQE_MAX_PROF; p++) {
@@ -603,12 +647,13 @@ static void wqe_report(int usable, int rssi)
 		if (met == was && !(fresh & bit))
 			continue;
 		send_wqe_status(p, met ? WQE_MET : WQE_NOT_MET);
+		if (met != was)
+			LOGI("WQE profile %u -> %s (rssi %d, threshold %d)", p,
+			     met ? "met" : "not met", rssi, hold);
 		if (met)
 			g_wqe_met |= bit;
 		else
 			g_wqe_met &= ~bit;
-		LOGI("WQE profile %u -> %s (rssi %d, threshold %d)", p,
-		     met ? "met" : "not met", rssi, hold);
 	}
 }
 
@@ -812,6 +857,8 @@ int main(int argc, char **argv)
 			g_wqe_met = 0;
 			if (dsd_register_inds())
 				LOGE("DSD indication register failed; no WQE reports");
+			else
+				wqe_seed();
 		}
 
 		/* WFC off: never feed/arm. Make sure no stale WLAN-available is left to
@@ -851,15 +898,19 @@ int main(int argc, char **argv)
 			 * modem hands it to LTE ~5 s after this write (proven). */
 			th2_assert(TH2_STOCK, &th2_status);   /* boot-time assert too */
 			sticky = 0;
-			wqe_report(0, RSSI_UNKNOWN);
 			/* Down edge: the modem never ages WLAN-available out on its own,
 			 * and a stale entry sends cold IMS re-attach down the ~45 s
 			 * IWLAN-first path ("Emergency calls only" wedge). Clear it; keep
-			 * the flag on failure so the next poll retries. */
+			 * the flag on failure so the next poll retries. No quality
+			 * verdict here: the modem withdraws its WQE requests itself on
+			 * WLAN loss, and a "not met" racing this message made IMS start
+			 * a quality handover whose verdict then outlived the reconnect
+			 * (bench 2026-11-01). The profiles start over on the next ask. */
 			if (wlan_reported && send_wlan_unavailable() == 0) {
 				wlan_reported = 0;
 				LOGI("wlan0 down: sent WLAN_NOT_AVAILABLE");
 			}
+			g_wqe_met = 0;
 			set_status("searching", &status);
 			nap_wait(FAST_SEC);
 			continue;
