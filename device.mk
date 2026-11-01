@@ -410,7 +410,8 @@ PRODUCT_PACKAGES += \
     wfc_wlan_bridge \
     wfc_efswrite \
     modem_b12 \
-    modem_evs
+    modem_evs \
+    init.pepito-modem-evs.rc
 
 # Modem tweaks (Settings > System > Modem tweaks, LineageParts
 # ModemTweaksSettings): data-centric NAS usage_preference ON by default —

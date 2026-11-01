@@ -127,3 +127,12 @@ cc_binary {
     ],
     cflags: ["-Wall", "-Werror"],
 }
+
+// The SIM-loaded trigger for modem_evs, on system_ext because vendor_init may
+// not read gsm.sim.state. See init.pepito-modem-evs.rc.
+prebuilt_etc {
+    name: "init.pepito-modem-evs.rc",
+    src: "init.pepito-modem-evs.rc",
+    sub_dir: "init",
+    system_ext_specific: true,
+}

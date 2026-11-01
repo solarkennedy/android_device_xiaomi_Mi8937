@@ -24,7 +24,6 @@ service qmux_modem_evs /vendor/bin/modem_evs
 on property:persist.gotweak.modem_evs_swb=* && property:ro.vendor.qmux.enable=1
     start qmux_modem_evs
 
-# A new SIM can make the modem load another carrier profile, which rewrites the
-# EVS item: look again once the SIM is up.
-on property:gsm.sim.state=LOADED && property:ro.vendor.qmux.enable=1
-    start qmux_modem_evs
+# The SIM-loaded re-run lives in init.pepito-modem-evs.rc on system_ext:
+# gsm.sim.state is a system radio_prop, which vendor_init may not read, so init
+# rejects a trigger on it in a vendor rc ("unexported property trigger").

@@ -1,0 +1,10 @@
+# SIM-loaded half of the EVS super-wideband switch (init.modem_evs.rc holds the
+# service and the boot/flip trigger). A new SIM can make the modem load another
+# carrier profile, which rewrites the EVS item: look again once the SIM is up.
+#
+# system_ext, not vendor: gsm.sim.state is a system radio_prop that vendor_init
+# may not read, and init drops a vendor rc trigger on it at parse time
+# ("unexported property trigger found"). Starting the vendor oneshot from here
+# is fine; ro.vendor.qmux.enable keeps it to pepito.
+on property:gsm.sim.state=LOADED && property:ro.vendor.qmux.enable=1
+    start qmux_modem_evs
