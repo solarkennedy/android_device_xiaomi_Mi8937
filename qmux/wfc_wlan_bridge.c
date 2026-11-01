@@ -62,6 +62,25 @@
  * unchanged), -80 is accepted. The store is EFS-backed, so a value left at
  * -80 by a previous boot is put back to stock on the next start.
  *
+ * Wi-Fi quality (WQE) reports — what T-Mobile needs (dut1, 2026-10-31,
+ * PLAN-android17.md): on a T-Mobile profile the modem runs its "ee/tmo"
+ * handover algorithm (qpDplHandOver.c "_Ex"), which only counts WLAN as a
+ * target once CnE has reported its quality; with no report the WLAN is "TRAT
+ * BAD" and IMS never leaves LTE, even idle and Wi-Fi only. The modem asks for
+ * the report itself: on Wi-Fi up it sends this client DSD IND 0x45 (WQE
+ * profile prepare: TLV 01 u32 profile id, optional 0x10/0x11 s16 RSSI
+ * thresholds) for each profile it wants (4..7 on T-Mobile), and IND 0x3f with
+ * the requested-profile mask (0 = none). We answer each with DSD 0x43
+ * {01 u32 profile, 10 u32 status, 11 u32 cause}: status 0 = quality met,
+ * anything else = not met (bench sweep: IND 0x40, the met mask, gains the
+ * profile only for status 0). Met = associated + framework-validated + RSSI at
+ * or above the profile's threshold (WQE_RSSI_HOLD when it names none, as
+ * T-Mobile's do; stock Verizon's named -65 and -80), with hysteresis. Reported as soon as the request arrives (the modem's wait timer
+ * is 10 s) and again on every change. Proven: those replies alone moved IMS
+ * voice to WLAN on the T-Mobile SIM and a 60 s call held on Wi-Fi. The
+ * Verizon profile does not wait for the report (it treats quality as
+ * INVALID and goes by preference; see the TH2 notes above).
+ *
  * Transport: QCCI on the nightly libqmi_cci, dlopen()ed (no import lib for the
  * vendor prebuilt); the ipc_router backend is forced by linking
  * libqmi_force_ipcr, whose socket() shim interposes the dlopen()ed libs too
@@ -71,6 +90,9 @@
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
@@ -112,6 +134,15 @@
 #define DSD_WLAN_AVAILABLE_REQ 0x0020
 #define DSD_WLAN_NOT_AVAILABLE_REQ 0x0021
 #define DSD_WLAN_MEAS_REQ      0x003c
+#define DSD_IND_REGISTER_REQ   0x0038  /* opt TLVs 0x10..0x1b u8 = 1 */
+#define DSD_WQE_STATUS_REQ     0x0043  /* 01 u32 profile, 10 u32 status, 11 u32 cause */
+#define DSD_WQE_MASK_IND       0x003f  /* 01 u64 requested-profile mask */
+#define DSD_WQE_PREPARE_IND    0x0045  /* 01 u32 profile, opt 10/11 s16 RSSI dBm */
+#define WQE_MET                0       /* 0x43 status: quality met */
+#define WQE_NOT_MET            1
+#define WQE_MAX_PROF           32
+#define WQE_RSSI_HOLD          (-80)   /* met at/above, when 0x45 names no threshold */
+#define WQE_HYST               5       /* ... and not met again below hold - this */
 #define DOWN_RETRIES    40      /* "down" oneshot: wait up to ~2 min for DSD */
 #define WQE_PROFILE_ID         1       /* the armed WQE profile on pepito; 3/6 -> err 22 */
 #define REPORT_RSSI            (-50)   /* strong. Handover is NOT RSSI-driven (part 41); */
@@ -153,9 +184,71 @@ static int (*p_release)(qmi_client_type);
 static qmi_idl_service_object_type (*p_dsd_get_so)(int, int, int);
 static qmi_idl_service_object_type (*p_imss_get_so)(int, int, int);
 
+/* WQE requests, written by the QCCI indication thread and consumed by the
+ * main loop (no sync QMI sends from the callback). g_wqe_req = profiles the
+ * modem has asked for; g_wqe_new = asked for since the last reply. */
+static _Atomic uint32_t g_wqe_req, g_wqe_new;
+static _Atomic int g_wqe_thr[WQE_MAX_PROF];   /* 0 = no threshold given */
+static int g_wake[2] = { -1, -1 };            /* ind_cb -> main loop nudge */
+
 static void ind_cb(qmi_client_type h, unsigned int m, void *b,
                    unsigned int l, void *c)
-{ (void)h; (void)m; (void)b; (void)l; (void)c; }
+{
+	const uint8_t *p = b, *e = p + l;
+	uint32_t prof = WQE_MAX_PROF;
+	int thr = 0, mask_seen = 0, mask_zero = 1;
+
+	(void)h; (void)c;
+	if (m != DSD_WQE_PREPARE_IND && m != DSD_WQE_MASK_IND)
+		return;
+	while (p + 3 <= e) {
+		uint8_t t = p[0];
+		uint16_t tl = (uint16_t)(p[1] | (p[2] << 8));
+		const uint8_t *v = p + 3;
+		if (v + tl > e)
+			break;
+		if (m == DSD_WQE_PREPARE_IND && t == 0x01 && tl == 4)
+			prof = (uint32_t)(v[0] | (v[1] << 8) | (v[2] << 16) | ((uint32_t)v[3] << 24));
+		else if (m == DSD_WQE_PREPARE_IND && t == 0x10 && tl == 2)
+			thr = (int16_t)(v[0] | (v[1] << 8));
+		else if (m == DSD_WQE_MASK_IND && t == 0x01 && tl == 8) {
+			mask_seen = 1;
+			for (int i = 0; i < 8; i++)
+				if (v[i])
+					mask_zero = 0;
+		}
+		p = v + tl;
+	}
+	if (m == DSD_WQE_PREPARE_IND && prof < WQE_MAX_PROF) {
+		atomic_store(&g_wqe_thr[prof], thr);
+		atomic_fetch_or(&g_wqe_req, 1u << prof);
+		atomic_fetch_or(&g_wqe_new, 1u << prof);
+	} else if (m == DSD_WQE_MASK_IND && mask_seen && mask_zero) {
+		atomic_store(&g_wqe_req, 0);   /* the modem withdrew every request */
+		atomic_store(&g_wqe_new, 0);
+	} else {
+		return;
+	}
+	if (g_wake[1] >= 0) {
+		char x = 1;
+		(void)!write(g_wake[1], &x, 1);
+	}
+}
+
+/* sleep(sec), but return early when ind_cb has a new WQE request. */
+static void nap_wait(int sec)
+{
+	struct pollfd pf = { .fd = g_wake[0], .events = POLLIN };
+	char buf[16];
+
+	if (g_wake[0] < 0) {
+		sleep(sec);
+		return;
+	}
+	if (poll(&pf, 1, sec * 1000) > 0)
+		while (read(g_wake[0], buf, sizeof(buf)) > 0)
+			;
+}
 
 static int qmux_enabled(void)
 {
@@ -463,6 +556,62 @@ static void send_wlan_meas(const struct wlan_info *w, uint32_t seq)
 	dsd_send(DSD_WLAN_MEAS_REQ, r, (unsigned)o);
 }
 
+/* Register this client for DSD indications (the WQE requests come as 0x45 /
+ * 0x3f). Registering everything 0x10..0x1b is what was proven on the bench;
+ * the others are low-rate (system status changes). */
+static int dsd_register_inds(void)
+{
+	uint8_t r[64];
+	uint8_t one = 1;
+	int o = 0;
+	for (uint8_t t = 0x10; t <= 0x1b; t++)
+		o = put_tlv(r, o, t, &one, 1);
+	return dsd_send(DSD_IND_REGISTER_REQ, r, (unsigned)o);
+}
+
+static void send_wqe_status(uint32_t prof, uint32_t status)
+{
+	uint8_t r[24];
+	uint32_t cause = 0;
+	int o = put_tlv(r, 0, 0x01, &prof, 4);
+	o = put_tlv(r, o, 0x10, &status, 4);
+	o = put_tlv(r, o, 0x11, &cause, 4);
+	dsd_send(DSD_WQE_STATUS_REQ, r, (unsigned)o);
+}
+
+/* Bring every requested profile's report in line with the link: met when
+ * want_met says so for that profile. Sends only on change, or for a profile the
+ * modem has just asked for (it waits ~10 s for an answer). */
+static uint32_t g_wqe_met;   /* profiles last reported met */
+
+static void wqe_report(int usable, int rssi)
+{
+	uint32_t req = atomic_load(&g_wqe_req);
+	uint32_t fresh = atomic_exchange(&g_wqe_new, 0);
+
+	g_wqe_met &= req;   /* a withdrawn profile starts over */
+	for (uint32_t p = 0; p < WQE_MAX_PROF; p++) {
+		uint32_t bit = 1u << p;
+		if (!(req & bit))
+			continue;
+		int thr = atomic_load(&g_wqe_thr[p]);
+		int hold = thr ? thr : WQE_RSSI_HOLD;
+		int release = hold - WQE_HYST;
+		int was = (g_wqe_met & bit) != 0;
+		int met = usable && rssi != RSSI_UNKNOWN &&
+		          rssi >= (was ? release : hold);
+		if (met == was && !(fresh & bit))
+			continue;
+		send_wqe_status(p, met ? WQE_MET : WQE_NOT_MET);
+		if (met)
+			g_wqe_met |= bit;
+		else
+			g_wqe_met &= ~bit;
+		LOGI("WQE profile %u -> %s (rssi %d, threshold %d)", p,
+		     met ? "met" : "not met", rssi, hold);
+	}
+}
+
 /* ---- IMSS handover-config steering (LTE threshold 2) ---- */
 static qmi_client_type g_imss;
 static qmi_idl_service_object_type g_imss_so;
@@ -627,6 +776,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (pipe2(g_wake, O_NONBLOCK | O_CLOEXEC))
+		g_wake[0] = g_wake[1] = -1;
+
 	uint32_t seq = 1;
 	const char *status = NULL;           /* current STATUS_PROP value */
 	const char *th2_status = NULL;       /* current TH2_STATUS_PROP value */
@@ -653,6 +805,13 @@ int main(int argc, char **argv)
 				sleep(FAST_SEC);
 				continue;
 			}
+			/* A fresh client has no indication registration and the
+			 * modem's WQE requests went to the old one. */
+			atomic_store(&g_wqe_req, 0);
+			atomic_store(&g_wqe_new, 0);
+			g_wqe_met = 0;
+			if (dsd_register_inds())
+				LOGE("DSD indication register failed; no WQE reports");
 		}
 
 		/* WFC off: never feed/arm. Make sure no stale WLAN-available is left to
@@ -665,6 +824,7 @@ int main(int argc, char **argv)
 				wlan_reported = 0;
 				LOGI("WFC off: cleared WLAN availability");
 			}
+			wqe_report(0, RSSI_UNKNOWN);
 			state = ST_SEARCH;
 			memset(cur_bssid, 0, 6);
 			/* WFC off = stock handover thresholds, always (also puts back a
@@ -691,6 +851,7 @@ int main(int argc, char **argv)
 			 * modem hands it to LTE ~5 s after this write (proven). */
 			th2_assert(TH2_STOCK, &th2_status);   /* boot-time assert too */
 			sticky = 0;
+			wqe_report(0, RSSI_UNKNOWN);
 			/* Down edge: the modem never ages WLAN-available out on its own,
 			 * and a stale entry sends cold IMS re-attach down the ~45 s
 			 * IWLAN-first path ("Emergency calls only" wedge). Clear it; keep
@@ -700,7 +861,7 @@ int main(int argc, char **argv)
 				LOGI("wlan0 down: sent WLAN_NOT_AVAILABLE");
 			}
 			set_status("searching", &status);
-			sleep(FAST_SEC);
+			nap_wait(FAST_SEC);
 			continue;
 		}
 
@@ -722,6 +883,11 @@ int main(int argc, char **argv)
 			     w.rssi, pref, ok, want_sticky ? "sticky" : "stock");
 		th2_assert(want_sticky ? TH2_STICKY : TH2_STOCK, &th2_status);
 		sticky = want_sticky && g_th2_known && g_th2 == TH2_STICKY;
+
+		/* Wi-Fi quality for the profiles the modem asked about. Validated
+		 * matters here as for TH2: a dead uplink must not look like a
+		 * usable target. */
+		wqe_report(ok, w.rssi);
 
 		/* A new/changed BSSID means a fresh association to prime. */
 		if (memcmp(cur_bssid, w.bssid, 6) != 0) {
@@ -763,6 +929,6 @@ int main(int argc, char **argv)
 				g_th2_known = 0;   /* and re-read TH2 from the modem */
 			}
 		}
-		sleep(nap);
+		nap_wait(nap);
 	}
 }
