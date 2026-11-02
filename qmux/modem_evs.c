@@ -23,9 +23,16 @@
  * This oneshot caps byte 9 at 02 unless the user allows super-wideband
  * (persist.gotweak.modem_evs_swb=1, Settings > PVG100 Modem Tweaks; default 0):
  *
- *   - Only a profile that asks for more than WB is touched, so no carrier
- *     check is needed and a profile without EVS, or already at WB, is left
- *     alone (status "none").
+ *   - Only the T-Mobile layout is touched: every byte but 9 must match
+ *     TMO_LAYOUT, the only layout byte 9 was isolated on. Verizon's hvolte
+ *     profile is laid out differently (01 00 10 00 00 00 6d 00 02 04 ...) and
+ *     has byte 9 = 04; 20261101 capped it, and Verizon calls to EVS-capable
+ *     phones then failed with "sdp parse failed" (ImsReasonInfo 1502), even
+ *     after a rollback, until modemst was restored. Any other layout is
+ *     "unsupported" and left alone.
+ *   - An item of another layout that this tool did cap (the marker matches) is
+ *     put back: byte 9 gets the saved value again, whatever the switch says.
+ *   - A profile without EVS, or already at WB, is left alone (status "none").
  *   - The original byte is saved first in MARKER_PATH (modem EFS, survives an
  *     Android data wipe); allowing SWB restores exactly that byte. A carrier
  *     profile reload (SIM swap) rewrites the item; the next run caps it again.
@@ -73,6 +80,26 @@
 #define EVS_BW_BYTE     9
 #define EVS_BW_WB       0x02
 #define EVS_BW_MAX      0x04  /* anything above is not a layout we know */
+/* The T-Mobile profile's item (tmo/commerci in C1-162128, C1-214411 and
+ * C1-222870), byte 9 aside; the only layout whose byte 9 is known. */
+static const uint8_t TMO_LAYOUT[EVS_CFG_LEN] = {
+	0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+};
+
+static int tmo_layout(const uint8_t *cfg)
+{
+	int i;
+
+	for (i = 0; i < EVS_CFG_LEN; i++)
+		if (i != EVS_BW_BYTE && cfg[i] != TMO_LAYOUT[i])
+			return 0;
+	return 1;
+}
+
+/* What a pass that wrote something settles to (main publishes it once the
+ * write has been flushed). */
+static const char *g_done = "none";
+
 /* In modem EFS (its /data, not Android's): the byte 9 we capped from. */
 #define MARKER_PATH     "/data/pepito_evs_bw"
 
@@ -611,6 +638,25 @@ static int apply(int swb)
 		return -1;
 	}
 
+	if (!tmo_layout(cfg)) {
+		/* Already at WB or below: nothing to cap, whatever the layout. */
+		const char *alone = bw > EVS_BW_WB ? "unsupported" : "none";
+
+		if (__system_property_get(BOOT_PROP, boot) <= 0)
+			__system_property_set(BOOT_PROP, saved ? state_of(bw, saved) : alone);
+		if (!saved) {
+			LOGI("%s: not the T-Mobile layout; left alone", EVS_CFG_PATH);
+			free(cfg);
+			status(alone);
+			return 0;
+		}
+		/* Ours, on a layout we must not touch: undo the cap. */
+		target = saved;
+		g_done = "unsupported";
+		LOGI("%s: not the T-Mobile layout; undoing the earlier cap", EVS_CFG_PATH);
+		goto write;
+	}
+
 	if (__system_property_get(BOOT_PROP, boot) <= 0)
 		__system_property_set(BOOT_PROP, state_of(bw, saved));
 
@@ -626,9 +672,11 @@ static int apply(int swb)
 		}
 		cfg[EVS_BW_BYTE] = mark;
 		target = EVS_BW_WB;
+		g_done = "capped";
 	} else if (swb && bw == EVS_BW_WB && saved) {
 		/* Allow SWB again: restore exactly the byte we capped from. */
 		target = saved;
+		g_done = "swb";
 	} else {
 		__system_property_get(BOOT_PROP, boot);
 		const char *now = state_of(bw, saved);
@@ -637,6 +685,7 @@ static int apply(int swb)
 		return 0;
 	}
 
+write:
 	cfg[EVS_BW_BYTE] = (uint8_t)target;
 	if (efs_write_all(EVS_CFG_PATH, cfg, len) < 0) {
 		free(cfg);
@@ -646,7 +695,7 @@ static int apply(int swb)
 	LOGI("%s: byte %d %d -> %d (verified)", EVS_CFG_PATH, EVS_BW_BYTE, bw, target);
 	free(cfg);
 
-	if (swb) {
+	if (target != EVS_BW_WB) {
 		/* Restored: an all-zero marker no longer matches any item. */
 		uint8_t none[EVS_CFG_LEN];
 
@@ -697,7 +746,7 @@ int main(void)
 		if (rc > 0) {
 			status("saving");
 			sleep(FLUSH_S);
-			status(settled_status(swb ? "swb" : "capped"));
+			status(settled_status(g_done));
 		}
 	} while (rc >= 0 && swb != want_swb());
 

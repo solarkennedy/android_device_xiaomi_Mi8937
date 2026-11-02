@@ -3,8 +3,8 @@
 # the modem EFS item /nv/item_files/ims/qipcall_evs_codec_config (byte 9) over
 # DCI on /dev/diag, unless the switch allows super-wideband: an EVS-SWB call
 # that starts with a voice calibration registered crashes the ADSP and the
-# modem (T-Mobile asks for SWB; PLAN-android17.md, "Bug 2026-10-30"). Only a
-# profile that asks for more than wideband is touched. Status in
+# modem (T-Mobile asks for SWB; PLAN-android17.md, "Bug 2026-10-30"). Only the
+# T-Mobile item layout is capped; a cap left on any other layout is undone. Status in
 # vendor.pepito.modem.evs. See modem_evs.c.
 #
 # The switch defaults to 0 (device.mk), so this runs once per boot to cap a
