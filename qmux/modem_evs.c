@@ -36,15 +36,35 @@
  *   - The original byte is saved first in MARKER_PATH (modem EFS, survives an
  *     Android data wipe); allowing SWB restores exactly that byte. A carrier
  *     profile reload (SIM swap) rewrites the item; the next run caps it again.
+ *   - The T-Mobile layout at WB is ours even without a marker: no carrier
+ *     profile in the modem ships it (all 78 MCFG profiles of C1-162128 and
+ *     C1-222870 swept, 2026-11-03: the 8 layouts in KNOWN_LAYOUTS). A lost
+ *     marker is rewritten so the switch can still restore SWB.
+ *   - An item shorter than 32 bytes whose bytes are a prefix of what the
+ *     marker says we wrote is our own interrupted write (O_TRUNC, then the
+ *     data never landed): the item is rebuilt from the marker, as the profile
+ *     asked for it, and the next pass caps it again if it should be.
  *   - Read-modify-write of byte 9 only, written only when it differs,
  *     verified by readback.
  *   - Writes reach flash only after the modem's EFS sync (~2-3 min) and the
  *     IMS stack reads the item at its own start, so a change takes effect on
- *     the next restart: status "saving" for FLUSH_S, then "restart".
+ *     the next restart: status "saving" for FLUSH_S, then "restart". After
+ *     the flush the item is read again: a profile reload (MCFG activation on
+ *     a new SIM, whose init trigger is a no-op `start` while this is still
+ *     running) or a modem restart during the flush would otherwise leave a
+ *     T-Mobile profile at SWB until the next boot.
  *
  * Status, vendor.pepito.modem.evs (vendor_public_prop, read by LineageParts):
  *   capped | swb | none | saving | restart | unsupported | failed | off
  * vendor.pepito.modem.evs_boot = capped|swb|none: what the modem booted with.
+ * For field reports ("did modem_evs ever write here?"), also per boot:
+ *   vendor.pepito.modem.evs_item   = the item as last read, 32 bytes hex
+ *   vendor.pepito.modem.evs_marker = absent | cleared | stale | <orig byte>
+ *                                    (the marker matches: capped from it)
+ *   vendor.pepito.modem.evs_write  = none | <what the last write this boot
+ *                                    did, e.g. "cap 3->2", "undo 2->4">
+ * and the same in logcat (tag modem_evs). A "cleared" marker means a cap
+ * was undone or SWB allowed on this unit at some point.
  *
  * Transport: DCI over /dev/diag, EFS2 subsystem, copied from modem_b12.
  */
@@ -70,10 +90,14 @@
 
 #define STATUS_PROP     "vendor.pepito.modem.evs"
 #define BOOT_PROP       "vendor.pepito.modem.evs_boot"
+#define ITEM_PROP       "vendor.pepito.modem.evs_item"
+#define MARKER_PROP     "vendor.pepito.modem.evs_marker"
+#define WRITE_PROP      "vendor.pepito.modem.evs_write"
 #define WANT_PROP       "persist.gotweak.modem_evs_swb"
 #define TOTAL_BUDGET_S  150   /* covers modem PIL boot + the early rmts SSR blip */
 #define RETRY_SLEEP_S   5
 #define FLUSH_S         180   /* modem EFS sync to flash, measured 2-3 min */
+#define MAX_WRITES      3     /* per run: cap, re-cap after a lost write, done */
 
 #define EVS_CFG_PATH    "/nv/item_files/ims/qipcall_evs_codec_config"
 #define EVS_CFG_LEN     32
@@ -85,6 +109,7 @@
 static const uint8_t TMO_LAYOUT[EVS_CFG_LEN] = {
 	0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
 };
+#define TMO_BW          0x03  /* what tmo/commerci ships in byte 9 */
 
 static int tmo_layout(const uint8_t *cfg)
 {
@@ -94,6 +119,63 @@ static int tmo_layout(const uint8_t *cfg)
 		if (i != EVS_BW_BYTE && cfg[i] != TMO_LAYOUT[i])
 			return 0;
 	return 1;
+}
+
+/*
+ * Every distinct qipcall_evs_codec_config a carrier profile in this modem
+ * ships (all 78 mcfg_sw.mbn of C1-162128 and C1-222870, identical in both;
+ * diag-tools/ims-codec/mbn-codec.py, 2026-11-03). Bytes 10..31 are zero
+ * except where shown. Used to name the item in the log and to tell a
+ * natively-WB profile from one we capped: the T-Mobile layout with byte 9 =
+ * 02 is in no profile, so an item like that without a marker is still ours.
+ * The live item can also differ from every profile (new2's Verizon item is
+ * 00 00 10 00 00 00 6d 00 03 02), so a miss here only means "not from the
+ * MCFG as shipped".
+ */
+static const struct {
+	const char *name;
+	uint8_t bytes[10];
+	int byte16;
+} KNOWN_LAYOUTS[] = {
+	{ "na/tmo/commerci",      { 0x00, 0x00, 0x10, 0, 0, 0, 0x00, 0, 0x02, 0x03 }, 0 },
+	{ "na/verizon/hvolte",    { 0x01, 0x00, 0x10, 0, 0, 0, 0x6d, 0, 0x02, 0x04 }, 0x6d },
+	{ "na/verizon/cdmaless",  { 0x00, 0x00, 0x10, 0, 0, 0, 0x00, 0, 0x00, 0x02 }, 0 },
+	{ "apac/dcm/commerci",    { 0x00, 0x00, 0x10, 0, 0, 0, 0x00, 0, 0xff, 0x04 }, 0 },
+	{ "apac/kddi/commerci",   { 0x00, 0x00, 0x18, 0, 0, 0, 0x00, 0, 0x02, 0x03 }, 0 },
+	{ "apac/sbm/commerci",    { 0x00, 0x00, 0x78, 0, 0, 0, 0x7e, 0, 0x02, 0x03 }, 0 },
+	{ "china/cmcc+ct lab",    { 0x00, 0x00, 0x78, 0, 0, 0, 0x00, 0, 0x02, 0x03 }, 0 },
+	{ "korea/kt+lgu+skt",     { 0x00, 0x00, 0x40, 0, 0, 0, 0x6e, 0, 0x00, 0x06 }, 0 },
+};
+
+/* The profile cfg is, as shipped, or NULL. */
+static const char *known_layout(const uint8_t *cfg)
+{
+	size_t k;
+	int i;
+
+	for (k = 0; k < sizeof(KNOWN_LAYOUTS) / sizeof(KNOWN_LAYOUTS[0]); k++) {
+		if (memcmp(cfg, KNOWN_LAYOUTS[k].bytes, 10) != 0)
+			continue;
+		for (i = 10; i < EVS_CFG_LEN; i++)
+			if (cfg[i] != (i == 16 ? KNOWN_LAYOUTS[k].byte16 : 0))
+				break;
+		if (i == EVS_CFG_LEN)
+			return KNOWN_LAYOUTS[k].name;
+	}
+	return NULL;
+}
+
+static const char *hex(const uint8_t *b, int len)
+{
+	static char s[2 * EVS_CFG_LEN + 1];
+	int i;
+
+	if (len > EVS_CFG_LEN)
+		len = EVS_CFG_LEN;
+	for (i = 0; i < len; i++)
+		snprintf(s + 2 * i, 3, "%02x", b[i]);
+	s[2 * len] = 0;
+	return s;
 }
 
 /* What a pass that wrote something settles to (main publishes it once the
@@ -138,6 +220,7 @@ struct diag_dci_reg_tbl_t {
 #define EFS_O_WRONLY         01
 #define EFS_O_CREAT        0100
 #define EFS_O_TRUNC       01000
+#define EFS_ENOENT            2   /* EFS2 errno: POSIX numbering */
 
 #define MAXPKT  (16 * 1024)
 
@@ -385,9 +468,14 @@ static int efs_read_all(const char *path, uint8_t **buf, int *outlen)
 	if (fd == EFS_XFER_FAIL)
 		return -1;
 	if (fd < 0 || err != 0) {
-		/* The modem refused the open (fd -1, errno typically ENOENT):
-		 * the file is absent. (wfc_efswrite's copy of this returns -1
-		 * here, because the modem reports a missing file as fd -1.) */
+		/* The modem refused the open (fd -1, errno ENOENT): the file is
+		 * absent. (wfc_efswrite's copy of this returns -1 here, because
+		 * the modem reports a missing file as fd -1.) Any other errno is
+		 * not "no such profile" and must not read as "none": say so. */
+		if (err != 0 && err != EFS_ENOENT) {
+			LOGE("OPEN %s refused: fd=%d efs_errno=%d", path, fd, err);
+			return -1;
+		}
 		return 1;
 	}
 
@@ -566,28 +654,53 @@ static const char *settled_status(const char *now)
  * saved value (the same profile reloaded). Anything else - another carrier's
  * profile after a SIM swap, a profile that is natively WB - is not ours, so
  * "allow SWB" can never raise a profile above what that profile itself asked
- * for. Returns the saved byte when the marker matches cfg, 0 when it does not
- * or is absent, -1 on a transport error.
+ * for. A marker whose first byte is 0 was cleared after a restore or an undo.
  */
-static int read_marker(const uint8_t *cfg)
-{
-	uint8_t *m = NULL, want[EVS_CFG_LEN];
-	int mlen = 0, rc, v = 0;
+#define MARKER_ABSENT   0
+#define MARKER_CLEARED  1
+#define MARKER_SET      2
+struct marker {
+	int     state;
+	uint8_t orig;                   /* the byte 9 we capped from */
+	uint8_t item[EVS_CFG_LEN];      /* the item as we wrote it */
+};
 
+/* Returns 0, or -1 on a transport error. */
+static int load_marker(struct marker *mk)
+{
+	uint8_t *m = NULL;
+	int mlen = 0, rc;
+
+	memset(mk, 0, sizeof(*mk));
 	rc = efs_read_all(MARKER_PATH, &m, &mlen);
 	if (rc < 0)
 		return -1;
-	if (rc == 0 && m && mlen == 1 + EVS_CFG_LEN &&
-	    m[0] > EVS_BW_WB && m[0] <= EVS_BW_MAX) {
-		memcpy(want, m + 1, EVS_CFG_LEN);
-		if (memcmp(want, cfg, EVS_CFG_LEN) == 0)
-			v = m[0];                       /* still capped */
-		want[EVS_BW_BYTE] = m[0];
-		if (memcmp(want, cfg, EVS_CFG_LEN) == 0)
-			v = m[0];                       /* same profile, reloaded */
+	if (rc == 0 && m && mlen == 1 + EVS_CFG_LEN) {
+		mk->orig = m[0];
+		memcpy(mk->item, m + 1, EVS_CFG_LEN);
+		mk->state = (m[0] > EVS_BW_WB && m[0] <= EVS_BW_MAX) ?
+			    MARKER_SET : MARKER_CLEARED;
+	} else if (rc == 0) {
+		LOGE("%s: %d bytes, not a marker; ignored", MARKER_PATH, mlen);
 	}
 	free(m);
-	return v;
+	return 0;
+}
+
+/* The saved byte when the marker is ours for this item, else 0. */
+static int marker_saved(const struct marker *mk, const uint8_t *cfg)
+{
+	uint8_t want[EVS_CFG_LEN];
+
+	if (mk->state != MARKER_SET)
+		return 0;
+	if (memcmp(mk->item, cfg, EVS_CFG_LEN) == 0)
+		return mk->orig;                /* still capped */
+	memcpy(want, mk->item, EVS_CFG_LEN);
+	want[EVS_BW_BYTE] = mk->orig;
+	if (memcmp(want, cfg, EVS_CFG_LEN) == 0)
+		return mk->orig;                /* same profile, reloaded */
+	return 0;
 }
 
 static int write_marker(uint8_t orig, const uint8_t *capped)
@@ -599,6 +712,38 @@ static int write_marker(uint8_t orig, const uint8_t *capped)
 	return efs_write_all(MARKER_PATH, m, sizeof(m));
 }
 
+/* MARKER_PROP + log: what the marker says about the item just read. */
+static void publish_marker(const struct marker *mk, int saved)
+{
+	char v[8];
+	const char *s = mk->state == MARKER_SET ? "stale" :
+			mk->state == MARKER_CLEARED ? "cleared" : "absent";
+
+	if (saved) {
+		snprintf(v, sizeof(v), "%d", saved);
+		s = v;
+	}
+	__system_property_set(MARKER_PROP, s);
+	if (mk->state == MARKER_SET)
+		LOGI("marker: capped from %d, item %s: %s", mk->orig,
+		     hex(mk->item, EVS_CFG_LEN), saved ? "matches" : "stale");
+	else
+		LOGI("marker: %s", s);
+}
+
+/* WRITE_PROP + log: a verified write of the item. */
+static void note_write(const char *what, int from, int to)
+{
+	char v[PROP_VALUE_MAX];
+
+	if (from < 0)
+		snprintf(v, sizeof(v), "%s ->%d", what, to);
+	else
+		snprintf(v, sizeof(v), "%s %d->%d", what, from, to);
+	__system_property_set(WRITE_PROP, v);
+	LOGI("%s: byte %d %s (verified)", EVS_CFG_PATH, EVS_BW_BYTE, v);
+}
+
 /*
  * One pass: bring byte 9 to what the switch asks for. Returns 1 if it wrote
  * anything, 0 if nothing needed writing (status already published), -1 on
@@ -608,6 +753,8 @@ static int apply(int swb)
 {
 	uint8_t *cfg = NULL;
 	char boot[PROP_VALUE_MAX] = {0};
+	struct marker mk;
+	const char *what, *name;
 	int len = 0, rc, bw, saved, target;
 	uint8_t mark;
 
@@ -616,27 +763,76 @@ static int apply(int swb)
 		status("failed");
 		return -1;
 	}
+	__system_property_set(ITEM_PROP, rc > 0 ? "absent" : hex(cfg, len));
 	if (rc > 0) {
 		/* No EVS settings in this profile: nothing to cap. */
+		LOGI("%s: absent", EVS_CFG_PATH);
 		status("none");
 		__system_property_set(BOOT_PROP, "none");
 		return 0;
 	}
+	name = len == EVS_CFG_LEN ? known_layout(cfg) : NULL;
+	LOGI("%s: %d bytes %s (%s)", EVS_CFG_PATH, len, hex(cfg, len),
+	     name ? name : "not a profile as shipped");
+
+	if (load_marker(&mk) < 0) {
+		free(cfg);
+		status("failed");
+		return -1;
+	}
+
+	if (len < EVS_CFG_LEN && mk.state == MARKER_SET &&
+	    memcmp(cfg, mk.item, len) == 0) {
+		/* Our own write, interrupted after its O_TRUNC: rebuild the
+		 * item as the profile asked for it. The next pass caps it
+		 * again if it should be. */
+		uint8_t item[EVS_CFG_LEN];
+
+		LOGE("%s: %d bytes = a prefix of what we wrote; rebuilding it "
+		     "from the marker", EVS_CFG_PATH, len);
+		publish_marker(&mk, mk.orig);
+		memcpy(item, mk.item, EVS_CFG_LEN);
+		item[EVS_BW_BYTE] = mk.orig;
+		free(cfg);
+		if (efs_write_all(EVS_CFG_PATH, item, EVS_CFG_LEN) < 0) {
+			status("failed");
+			return -1;
+		}
+		note_write("rebuild", -1, mk.orig);
+		g_done = "restart";
+		return 1;
+	}
+
 	if (len != EVS_CFG_LEN || cfg[EVS_BW_BYTE] > EVS_BW_MAX) {
 		LOGI("%s: %d bytes, byte %d = %d: not a layout we know",
 		     EVS_CFG_PATH, len, EVS_BW_BYTE, len > EVS_BW_BYTE ? cfg[EVS_BW_BYTE] : -1);
+		publish_marker(&mk, 0);
 		free(cfg);
 		status("unsupported");
 		return 0;
 	}
 	bw = cfg[EVS_BW_BYTE];
+	saved = marker_saved(&mk, cfg);
 
-	saved = read_marker(cfg);
-	if (saved < 0) {
-		free(cfg);
-		status("failed");
-		return -1;
+	if (!saved && bw == EVS_BW_WB && tmo_layout(cfg)) {
+		/* The T-Mobile layout at WB ships in no profile (KNOWN_LAYOUTS):
+		 * capped by an earlier run whose marker is gone, or stale from
+		 * another SIM. Put the marker back so "allow SWB" can restore
+		 * it; if this write is lost to an early reboot the next run
+		 * does it again. */
+		LOGI("%s: T-Mobile layout at WB with no matching marker: capped "
+		     "by an earlier run; rewriting the marker", EVS_CFG_PATH);
+		if (write_marker(TMO_BW, cfg) < 0) {
+			free(cfg);
+			status("failed");
+			return -1;
+		}
+		mk.state = MARKER_SET;
+		mk.orig = TMO_BW;
+		memcpy(mk.item, cfg, EVS_CFG_LEN);
+		saved = TMO_BW;
 	}
+	publish_marker(&mk, saved);
 
 	if (!tmo_layout(cfg)) {
 		/* Already at WB or below: nothing to cap, whatever the layout. */
@@ -647,11 +843,14 @@ static int apply(int swb)
 		if (!saved) {
 			LOGI("%s: not the T-Mobile layout; left alone", EVS_CFG_PATH);
 			free(cfg);
-			status(alone);
+			/* "restart" after an undo this boot, until the reboot. */
+			__system_property_get(BOOT_PROP, boot);
+			status(strcmp(boot, alone) ? "restart" : alone);
 			return 0;
 		}
 		/* Ours, on a layout we must not touch: undo the cap. */
 		target = saved;
+		what = "undo";
 		g_done = "unsupported";
 		LOGI("%s: not the T-Mobile layout; undoing the earlier cap", EVS_CFG_PATH);
 		goto write;
@@ -672,10 +871,12 @@ static int apply(int swb)
 		}
 		cfg[EVS_BW_BYTE] = mark;
 		target = EVS_BW_WB;
+		what = "cap";
 		g_done = "capped";
 	} else if (swb && bw == EVS_BW_WB && saved) {
 		/* Allow SWB again: restore exactly the byte we capped from. */
 		target = saved;
+		what = "restore";
 		g_done = "swb";
 	} else {
 		__system_property_get(BOOT_PROP, boot);
@@ -692,7 +893,7 @@ write:
 		status("failed");
 		return -1;
 	}
-	LOGI("%s: byte %d %d -> %d (verified)", EVS_CFG_PATH, EVS_BW_BYTE, bw, target);
+	note_write(what, bw, target);
 	free(cfg);
 
 	if (target != EVS_BW_WB) {
@@ -700,55 +901,87 @@ write:
 		uint8_t none[EVS_CFG_LEN];
 
 		memset(none, 0, sizeof(none));
-		if (write_marker(0, none) < 0) {
-			status("failed");
-			return -1;
-		}
+		if (write_marker(0, none) < 0)
+			/* Not fatal: the item is back as the profile asked, and a
+			 * marker left behind only ever matches this very item. */
+			LOGE("%s: could not clear the marker; the item is restored anyway",
+			     MARKER_PATH);
 	}
 	return 1;
 }
 
-int main(void)
+/* DCI + EFS2 hello, retried until the modem answers or the budget runs out.
+ * The modem boots long after init. 0 / -1. */
+static int efs_connect(void)
 {
 	time_t start = time(NULL);
-	int swb, rc;
+
+	for (;;) {
+		if (g_fd < 0 && dci_open() == 0) {
+			if (efs_hello() == 0)
+				return 0;
+			dci_close();
+		}
+		if (time(NULL) - start > TOTAL_BUDGET_S) {
+			LOGE("modem EFS2 never answered within %ds", TOTAL_BUDGET_S);
+			dci_close();
+			return -1;
+		}
+		sleep(RETRY_SLEEP_S);
+	}
+}
+
+int main(void)
+{
+	char v[PROP_VALUE_MAX] = {0};
+	const char *settled = NULL;
+	int swb, rc, writes = 0;
 
 	if (!qmux_enabled()) {
 		LOGI("qmux not enabled; nothing to do");
 		status("off");
 		return 0;
 	}
+	if (__system_property_get(WRITE_PROP, v) <= 0)
+		__system_property_set(WRITE_PROP, "none");
 
-	/* The modem boots long after init: retry DCI + EFS2 hello until it
-	 * answers or the budget runs out. */
-	for (;;) {
-		if (g_fd < 0 && dci_open() == 0) {
-			if (efs_hello() == 0)
-				break;
-			dci_close();
-		}
-		if (time(NULL) - start > TOTAL_BUDGET_S) {
-			LOGE("modem EFS2 never answered within %ds", TOTAL_BUDGET_S);
-			status("failed");
-			dci_close();
-			return 1;
-		}
-		sleep(RETRY_SLEEP_S);
+	if (efs_connect() < 0) {
+		status("failed");
+		return 1;
 	}
 
-	/* init `start`s this on every change of the switch, which is a no-op
-	 * while a run is still flushing; so re-read the switch after each pass
-	 * and go again if the user flipped it meanwhile. */
+	/* init `start`s this on every change of the switch and on SIM load,
+	 * both no-ops while a run is still flushing; so after a write, and
+	 * whenever the switch moved meanwhile, read the item again and go
+	 * again. A modem restart during the flush drops the DCI client, so
+	 * reconnect first. */
 	do {
 		swb = want_swb();
 		LOGI("switch: EVS super-wideband %s", swb ? "allowed" : "capped to WB");
 		rc = apply(swb);
+		if (rc < 0 && settled) {
+			/* The write before it was verified and flushed: keep
+			 * saying so rather than "failed" for the re-check. */
+			LOGE("re-check failed; keeping status %s", settled);
+			status(settled);
+			break;
+		}
 		if (rc > 0) {
 			status("saving");
 			sleep(FLUSH_S);
-			status(settled_status(g_done));
+			settled = settled_status(g_done);
+			status(settled);
+			if (++writes >= MAX_WRITES) {
+				LOGE("%d writes this run; not checking again", writes);
+				break;
+			}
+			dci_close();
+			if (efs_connect() < 0) {
+				LOGE("no modem after the flush; keeping status %s", settled);
+				break;
+			}
 		}
-	} while (rc >= 0 && swb != want_swb());
+	} while (rc > 0 || (rc == 0 && swb != want_swb()));
 
 	dci_close();
 	return rc < 0 ? 1 : 0;
