@@ -38,14 +38,6 @@ prebuilt_etc {
     system_ext_specific: true,
 }
 
-// system_ext: writes /data/misc/adb/adb_keys, a core_data_file_type (see the rc).
-prebuilt_etc {
-    name: "init.pepito-adbkeys.rc",
-    src: "etc/init.pepito-adbkeys.rc",
-    sub_dir: "init",
-    system_ext_specific: true,
-}
-
 prebuilt_etc {
     name: "init.xiaomi.device.rc",
     src: "etc/init.xiaomi.device.rc",
