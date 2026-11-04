@@ -131,12 +131,14 @@ static void set_pepito_identity()
 }
 
 // EXPERIMENT (Play Integrity, PLAN-integrity.md 2026-11-03): report the stock
-// Palm 8.1 fingerprint instead of the honest one. Google's -12 server error is
+// Palm 8.1 identity instead of the honest one. Google's -12 server error is
 // gone and we now get an empty verdict, while a Key2 port that spoofs its stock
-// 8.1 fingerprint gets BASIC. This tests whether the fingerprint is the
-// difference. ro.build.version.* stay real (a lower SDK bootloops). Revert once
-// the answer is in.
-static void set_pepito_stock_fingerprint()
+// 8.1 fingerprint gets BASIC. The fingerprint alone didn't move ours, so match
+// every identity prop that differs from a stock v1AML-0 unit (silver,
+// getprop) and that apps or checkin can see. ro.build.version.* stay real (a
+// lower SDK bootloops). first_api_level 25 -> 27 is below every vold/init
+// threshold either way (Q, V). Revert once the answer is in.
+static void set_pepito_stock_identity()
 {
     static const std::string fp =
             "Palm/PVG100/Pepito:8.1.0/OPM1.171019.019/v1AML-0:user/release-keys";
@@ -145,6 +147,15 @@ static void set_pepito_stock_fingerprint()
     property_override("ro.bootimage.build.fingerprint", fp);
     property_override("ro.build.description",
                       "Pepito-user 8.1.0 OPM1.171019.019 v1AML-0 release-keys");
+    set_ro_build_prop("id", "OPM1.171019.019");
+    set_ro_build_prop("type", "user");
+    set_ro_build_prop("device", "Pepito", true);
+    property_override("ro.build.product", "Pepito");
+    property_override("ro.product.board", "QC_Reference_Phone");
+    property_override("ro.product.first_api_level", "27");
+    property_override("ro.bootloader", "unknown");
+    property_override("ro.boot.flash.locked", "1");
+    property_override("ro.com.google.gmsversion", "8.1_201812");
 }
 
 static void determine_device()
@@ -182,7 +193,7 @@ static void determine_device()
         set_variant_props(pepito_info);
         property_override("ro.vendor.qmux.enable", "1");
         set_pepito_identity();
-        set_pepito_stock_fingerprint();
+        set_pepito_stock_identity();
     } else if (codename == "ugg") {
         set_variant_props(ugg_info);
     }
