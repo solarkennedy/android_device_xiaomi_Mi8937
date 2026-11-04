@@ -295,6 +295,7 @@ endif
 PRODUCT_PACKAGES += \
     fstab.qcom.ramdisk \
     init.baseband.sh \
+    init.pepito-adbkeys.rc \
     init.pepito-gsfid.rc \
     init.pepito-gsfid.sh \
     init.pepito-sensors.rc \
