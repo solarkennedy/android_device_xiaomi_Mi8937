@@ -43,12 +43,6 @@ DEVICE_PACKAGE_OVERLAYS += \
     $(LOCAL_PATH)/overlay-pepito
 endif
 
-# libpifprop: JNI bridge to bionic process-local property overrides, used by
-# the framework Play Integrity hook (android.security.pif) in the DroidGuard
-# process only. Inert unless a spoof_pif_config with spoofProps is set.
-PRODUCT_PACKAGES += \
-    libpifprop
-
 ifeq ($(PRODUCT_HARDWARE),Mi8917)
 PRODUCT_PACKAGES += \
     xiaomi_rolex_overlay \
