@@ -130,23 +130,6 @@ static void set_pepito_identity()
     set_ro_build_prop("name", "PVG100", true);
 }
 
-// EXPERIMENT (Play Integrity, PLAN-integrity.md 2026-11-03): report the stock
-// Palm 8.1 fingerprint instead of the honest one. Google's -12 server error is
-// gone and we now get an empty verdict, while a Key2 port that spoofs its stock
-// 8.1 fingerprint gets BASIC. This tests whether the fingerprint is the
-// difference. ro.build.version.* stay real (a lower SDK bootloops). Revert once
-// the answer is in.
-static void set_pepito_stock_fingerprint()
-{
-    static const std::string fp =
-            "Palm/PVG100/Pepito:8.1.0/OPM1.171019.019/v1AML-0:user/release-keys";
-
-    set_ro_build_prop("fingerprint", fp);
-    property_override("ro.bootimage.build.fingerprint", fp);
-    property_override("ro.build.description",
-                      "Pepito-user 8.1.0 OPM1.171019.019 v1AML-0 release-keys");
-}
-
 static void determine_device()
 {
     std::string codename;
@@ -182,7 +165,6 @@ static void determine_device()
         set_variant_props(pepito_info);
         property_override("ro.vendor.qmux.enable", "1");
         set_pepito_identity();
-        set_pepito_stock_fingerprint();
     } else if (codename == "ugg") {
         set_variant_props(ugg_info);
     }
