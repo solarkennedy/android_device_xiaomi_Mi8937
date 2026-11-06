@@ -54,6 +54,19 @@
  *     running) or a modem restart during the flush would otherwise leave a
  *     T-Mobile profile at SWB until the next boot.
  *
+ * Byte 9 only caps what we OFFER. Answering a call whose offer is EVS-SWB still
+ * runs SWB (bench, dut1 C1-162128 + T-Mobile, capped, called from a Pixel:
+ * audioQuality 19, and the ADSP crash on a device switch; a T-Mobile user,
+ * 2026-11-05: an incoming call crashed the moment it was answered). So for the
+ * T-Mobile layout this also takes EVS out of the IMS codec list,
+ * /nv/item_files/ims/qipcall_audio_codec_list ("EVS;AMR_WB_BE;AMR_WB_OA;
+ * AMR_BE;AMR_OA" -> "AMR_WB_BE;AMR_WB_OA;AMR_BE;AMR_OA"): calls in both
+ * directions then come up AMR-WB (audioQuality 2), which never crashes (same
+ * bench, both directions, speaker switched on and off). The original list is
+ * saved in LIST_MARKER_PATH first; allowing SWB puts it back, and the next
+ * restart lets EVS (and byte 9's SWB) be negotiated again. A profile reload
+ * puts EVS back in the list; the next run takes it out again.
+ *
  * Status, vendor.pepito.modem.evs (vendor_public_prop, read by LineageParts):
  *   capped | swb | none | saving | restart | unsupported | failed | off
  * vendor.pepito.modem.evs_boot = capped|swb|none: what the modem booted with.
@@ -184,6 +197,16 @@ static const char *g_done = "none";
 
 /* In modem EFS (its /data, not Android's): the byte 9 we capped from. */
 #define MARKER_PATH     "/data/pepito_evs_bw"
+
+/* The IMS codec preference list (NUL-padded, ';'-separated) and, in modem
+ * EFS, the list as the profile shipped it before we took EVS out. */
+#define CODEC_LIST_PATH   "/nv/item_files/ims/qipcall_audio_codec_list"
+#define LIST_MARKER_PATH  "/data/pepito_evs_codecs"
+#define CODEC_LIST_MAX    128
+
+/* Set by apply() when the item is the T-Mobile layout: the codec list is only
+ * ever touched for that profile. */
+static int g_tmo = 0;
 
 /* ---- kernel ABI (include/linux/diagchar.h) ---- */
 #define DCI_DATA_TYPE             0x00000040
@@ -856,6 +879,7 @@ static int apply(int swb)
 		goto write;
 	}
 
+	g_tmo = 1;
 	if (__system_property_get(BOOT_PROP, boot) <= 0)
 		__system_property_set(BOOT_PROP, state_of(bw, saved));
 
@@ -910,6 +934,112 @@ write:
 	return 1;
 }
 
+/*
+ * list[len] without its "EVS" entries, NUL-padded back to len, into out.
+ * Returns how many entries it took out.
+ */
+static int strip_evs(const uint8_t *list, int len, uint8_t *out)
+{
+	char in[CODEC_LIST_MAX + 1], *tok, *save = NULL;
+	int o = 0, n = 0;
+
+	memcpy(in, list, len);
+	in[len] = 0;
+	memset(out, 0, len);
+	for (tok = strtok_r(in, ";", &save); tok; tok = strtok_r(NULL, ";", &save)) {
+		int tl = (int)strlen(tok);
+
+		if (strcmp(tok, "EVS") == 0) {
+			n++;
+			continue;
+		}
+		if (o + (o ? 1 : 0) + tl > len)
+			break;
+		if (o)
+			out[o++] = ';';
+		memcpy(out + o, tok, tl);
+		o += tl;
+	}
+	return n;
+}
+
+/*
+ * The codec list for the T-Mobile layout: EVS out unless SWB is allowed, the
+ * shipped list back if it is and we took EVS out. Same return as apply().
+ */
+static int apply_codec_list(int swb)
+{
+	uint8_t *list = NULL, *orig = NULL;
+	uint8_t stripped[CODEC_LIST_MAX];
+	int len = 0, olen = 0, rc, rcm, ret = 0;
+
+	if (!g_tmo)
+		return 0;
+	rc = efs_read_all(CODEC_LIST_PATH, &list, &len);
+	if (rc < 0)
+		return -1;
+	if (rc > 0 || len <= 0 || len > CODEC_LIST_MAX) {
+		LOGI("%s: %s; left alone", CODEC_LIST_PATH, rc > 0 ? "absent" : "unexpected size");
+		free(list);
+		return 0;
+	}
+	rcm = efs_read_all(LIST_MARKER_PATH, &orig, &olen);
+	if (rcm < 0) {
+		free(list);
+		return -1;
+	}
+	if (rcm > 0 || olen != len) {          /* absent, or cleared (1 byte) */
+		free(orig);
+		orig = NULL;
+	}
+
+	if (!swb) {
+		if (strip_evs(list, len, stripped) == 0) {
+			LOGI("%s: no EVS entry", CODEC_LIST_PATH);
+			goto out;
+		}
+		/* Save the list as shipped first (once: a reload of the same
+		 * profile puts the same list back). */
+		if (!orig || memcmp(orig, list, len) != 0) {
+			if (efs_write_all(LIST_MARKER_PATH, list, len) < 0) {
+				ret = -1;
+				goto out;
+			}
+		}
+		if (efs_write_all(CODEC_LIST_PATH, stripped, len) < 0) {
+			ret = -1;
+			goto out;
+		}
+		LOGI("%s: EVS taken out (verified)", CODEC_LIST_PATH);
+		__system_property_set(WRITE_PROP, "codecs -EVS");
+		ret = 1;
+	} else if (orig) {
+		/* Ours only if the list is still what we made of the saved one. */
+		if (strip_evs(orig, len, stripped) == 0 || memcmp(stripped, list, len) != 0) {
+			LOGI("%s: not the list we stripped; left alone", CODEC_LIST_PATH);
+			goto out;
+		}
+		if (efs_write_all(CODEC_LIST_PATH, orig, len) < 0) {
+			ret = -1;
+			goto out;
+		}
+		LOGI("%s: shipped list restored (verified)", CODEC_LIST_PATH);
+		__system_property_set(WRITE_PROP, "codecs +EVS");
+		{
+			const uint8_t cleared = 0;
+
+			if (efs_write_all(LIST_MARKER_PATH, &cleared, 1) < 0)
+				LOGE("%s: could not clear; the list is restored anyway",
+				     LIST_MARKER_PATH);
+		}
+		ret = 1;
+	}
+out:
+	free(list);
+	free(orig);
+	return ret;
+}
+
 /* DCI + EFS2 hello, retried until the modem answers or the budget runs out.
  * The modem boots long after init. 0 / -1. */
 static int efs_connect(void)
@@ -958,7 +1088,21 @@ int main(void)
 	do {
 		swb = want_swb();
 		LOGI("switch: EVS super-wideband %s", swb ? "allowed" : "capped to WB");
+		g_tmo = 0;
 		rc = apply(swb);
+		if (rc >= 0) {
+			int lrc = apply_codec_list(swb);
+
+			if (lrc < 0) {
+				status("failed");
+				rc = -1;
+			} else if (lrc > 0) {
+				/* The IMS stack reads the list at its own start. */
+				if (rc == 0)
+					g_done = "restart";
+				rc = 1;
+			}
+		}
 		if (rc < 0 && settled) {
 			/* The write before it was verified and flushed: keep
 			 * saying so rather than "failed" for the re-check. */
