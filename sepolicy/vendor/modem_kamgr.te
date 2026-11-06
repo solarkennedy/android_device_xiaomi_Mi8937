@@ -1,0 +1,14 @@
+# modem_kamgr — stale keep-alive PDN config cleanup oneshot (qmux/init.modem_kamgr.rc).
+# QMI PDC over the ipc_router (as ims_enabler) to read the active carrier
+# profile, then DCI/EFS2 on /dev/diag (as modem_evs) to delete the file.
+type modem_kamgr, domain;
+type modem_kamgr_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(modem_kamgr)
+
+allow modem_kamgr self:socket create_socket_perms;
+allowxperm modem_kamgr self:socket ioctl msm_sock_ipc_ioctls;
+allow modem_kamgr diag_device:chr_file rw_file_perms;
+
+# The qmux gate, and the status it publishes (vendor_pepito_modem_prop).
+get_prop(modem_kamgr, vendor_qmux_prop)
+set_prop(modem_kamgr, vendor_pepito_modem_prop)

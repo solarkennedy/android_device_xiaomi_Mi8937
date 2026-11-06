@@ -1,0 +1,8 @@
+# SIM-loaded half of the keep-alive cleanup (init.modem_kamgr.rc holds the
+# service and the boot trigger). A new SIM can make the modem activate another
+# carrier profile; look again once the SIM is up.
+#
+# system_ext, not vendor: gsm.sim.state is a system radio_prop that vendor_init
+# may not read (same split as init.pepito-modem-evs.rc).
+on property:gsm.sim.state=LOADED && property:ro.vendor.qmux.enable=1
+    start qmux_modem_kamgr

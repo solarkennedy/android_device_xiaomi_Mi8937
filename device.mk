@@ -406,13 +406,18 @@ PRODUCT_COPY_FILES += \
 #   and NV 6828 bit 11 when the user turns it on; see qmux/modem_b12.c)
 # + EVS bandwidth oneshot (Modem tweaks; caps VoLTE EVS at wideband unless the
 #   user allows super-wideband, which crashes the ADSP; see qmux/modem_evs.c)
+# + keep-alive PDN cleanup oneshot (deletes a Verizon-era keep-alive config the
+#   active carrier profile doesn't ship; 12-min T-Mobile data gaps, see
+#   qmux/modem_kamgr.c)
 PRODUCT_PACKAGES += \
     ims_enabler \
     wfc_wlan_bridge \
     wfc_efswrite \
     modem_b12 \
     modem_evs \
-    init.pepito-modem-evs.rc
+    init.pepito-modem-evs.rc \
+    modem_kamgr \
+    init.pepito-modem-kamgr.rc
 
 # Modem tweaks (Settings > System > Modem tweaks, LineageParts
 # ModemTweaksSettings): data-centric NAS usage_preference ON by default —

@@ -136,3 +136,28 @@ prebuilt_etc {
     sub_dir: "init",
     system_ext_specific: true,
 }
+
+// modem_kamgr — [qmux] deletes the modem EFS keep-alive PDN config
+// (/data/ds_eps_kamgr_pdn.txt) when the active carrier profile (QMI PDC) does
+// not ship it: a Verizon-era "PROFILE_ID:3;" on a unit now on T-Mobile points
+// keep-alive at the "sos" emergency profile. QMI like ims_enabler (so it links
+// libqmi_force_ipcr), EFS2 over DCI like modem_evs. See modem_kamgr.c.
+cc_binary {
+    name: "modem_kamgr",
+    srcs: ["modem_kamgr.c"],
+    vendor: true,
+    init_rc: ["init.modem_kamgr.rc"],
+    shared_libs: [
+        "libqmi_force_ipcr",
+        "liblog",
+    ],
+    cflags: ["-Wall", "-Werror"],
+}
+
+// The SIM-loaded trigger for modem_kamgr, on system_ext like modem_evs's.
+prebuilt_etc {
+    name: "init.pepito-modem-kamgr.rc",
+    src: "init.pepito-modem-kamgr.rc",
+    sub_dir: "init",
+    system_ext_specific: true,
+}

@@ -1,0 +1,19 @@
+# Stale keep-alive PDN config cleanup. modem_kamgr deletes the modem EFS file
+# /data/ds_eps_kamgr_pdn.txt when the active carrier profile (QMI PDC) is not
+# one that ships it: a Verizon-era "PROFILE_ID:3;" left on a unit now on
+# T-Mobile keeps the "sos" emergency PDN in a 28-s retry loop, and T-Mobile's
+# implicit detaches then cost 12 minutes of data (T3402). Status in
+# vendor.pepito.modem.kamgr. See modem_kamgr.c, PLAN-network-detach.md.
+service qmux_modem_kamgr /vendor/bin/modem_kamgr
+    class main
+    user root
+    # vendor_qti_diag owns /dev/diag; same DAC route as qmux_modem_evs.
+    group root vendor_qti_diag
+    oneshot
+    disabled
+
+on boot && property:ro.vendor.qmux.enable=1
+    start qmux_modem_kamgr
+
+# The SIM-loaded re-run lives in init.pepito-modem-kamgr.rc on system_ext:
+# vendor_init may not read gsm.sim.state (see init.modem_evs.rc).
