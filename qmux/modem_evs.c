@@ -204,6 +204,12 @@ static const char *g_done = "none";
 #define LIST_MARKER_PATH  "/data/pepito_evs_codecs"
 #define CODEC_LIST_MAX    128
 
+/* The list tmo/commerci ships (C1-162128, C1-214411, C1-222870). */
+#define TMO_CODEC_LIST    "EVS;AMR_WB_BE;AMR_WB_OA;AMR_BE;AMR_OA"
+/* "1" once this boot's runs wrote the list: the IMS stack read the old one at
+ * its start, so the status stays "restart" until the next boot. */
+#define LIST_WRITE_PROP   "vendor.pepito.modem.evs_list_write"
+
 /* Set by apply() when the item is the T-Mobile layout: the codec list is only
  * ever touched for that profile. */
 static int g_tmo = 0;
@@ -963,14 +969,41 @@ static int strip_evs(const uint8_t *list, int len, uint8_t *out)
 	return n;
 }
 
+/* A saved list we can trust: 1..CODEC_LIST_MAX bytes with an EVS entry. */
+static int sane_list(const uint8_t *l, int len)
+{
+	uint8_t tmp[CODEC_LIST_MAX];
+
+	return l && len > 0 && len <= CODEC_LIST_MAX && strip_evs(l, len, tmp) > 0;
+}
+
+static int write_list(const uint8_t *list, int len, const char *what)
+{
+	if (efs_write_all(CODEC_LIST_PATH, list, len) < 0)
+		return -1;
+	LOGI("%s: %s (verified)", CODEC_LIST_PATH, what);
+	__system_property_set(LIST_WRITE_PROP, "1");
+	return 0;
+}
+
 /*
  * The codec list for the T-Mobile layout: EVS out unless SWB is allowed, the
  * shipped list back if it is and we took EVS out. Same return as apply().
+ *
+ *   - The shipped list is saved in LIST_MARKER_PATH before the list is
+ *     written, so a reboot during the flush never leaves a stripped list
+ *     without its original.
+ *   - An empty list, or one that is a prefix of the list we would have
+ *     written, is our own interrupted write (O_TRUNC, then the data never
+ *     landed): it is rebuilt from the saved copy.
+ *   - A stripped T-Mobile list with no saved copy (lost, or never saved) is
+ *     ours too: no profile ships T-Mobile's list without EVS. The saved copy
+ *     is put back as T-Mobile ships it, so the switch can still restore EVS.
  */
 static int apply_codec_list(int swb)
 {
 	uint8_t *list = NULL, *orig = NULL;
-	uint8_t stripped[CODEC_LIST_MAX];
+	uint8_t stripped[CODEC_LIST_MAX], want[CODEC_LIST_MAX];
 	int len = 0, olen = 0, rc, rcm, ret = 0;
 
 	if (!g_tmo)
@@ -978,7 +1011,7 @@ static int apply_codec_list(int swb)
 	rc = efs_read_all(CODEC_LIST_PATH, &list, &len);
 	if (rc < 0)
 		return -1;
-	if (rc > 0 || len <= 0 || len > CODEC_LIST_MAX) {
+	if (rc > 0 || len < 0 || len > CODEC_LIST_MAX) {
 		LOGI("%s: %s; left alone", CODEC_LIST_PATH, rc > 0 ? "absent" : "unexpected size");
 		free(list);
 		return 0;
@@ -988,7 +1021,59 @@ static int apply_codec_list(int swb)
 		free(list);
 		return -1;
 	}
-	if (rcm > 0 || olen != len) {          /* absent, or cleared (1 byte) */
+	if (rcm > 0 || !sane_list(orig, olen)) {   /* absent, or cleared (1 byte) */
+		free(orig);
+		orig = NULL;
+		olen = 0;
+	}
+
+	if (!orig && len > 0) {
+		/* Lost saved copy: is this T-Mobile's list as we strip it? */
+		uint8_t ship[CODEC_LIST_MAX];
+
+		memset(ship, 0, len);
+		memcpy(ship, TMO_CODEC_LIST, strlen(TMO_CODEC_LIST) <= (size_t)len ?
+		       strlen(TMO_CODEC_LIST) : (size_t)len);
+		if (strlen(TMO_CODEC_LIST) <= (size_t)len) {
+			strip_evs(ship, len, stripped);
+			if (memcmp(stripped, list, len) == 0) {
+				LOGI("%s: T-Mobile list without EVS and no saved copy: ours; "
+				     "rewriting the saved copy", CODEC_LIST_PATH);
+				if (efs_write_all(LIST_MARKER_PATH, ship, len) < 0) {
+					ret = -1;
+					goto out;
+				}
+				orig = malloc(len);
+				if (!orig) {
+					ret = -1;
+					goto out;
+				}
+				memcpy(orig, ship, len);
+				olen = len;
+			}
+		}
+	}
+
+	if (orig && (len < olen) &&
+	    (len == 0 || (strip_evs(orig, olen, stripped), memcmp(list, stripped, len) == 0) ||
+	     memcmp(list, orig, len) == 0)) {
+		/* Our own interrupted write: rebuild what this pass wants. */
+		LOGE("%s: %d bytes, a prefix of what we write; rebuilding it from the "
+		     "saved copy", CODEC_LIST_PATH, len);
+		if (swb)
+			memcpy(want, orig, olen);
+		else
+			strip_evs(orig, olen, want);
+		ret = write_list(want, olen, swb ? "rebuilt as shipped" : "rebuilt without EVS") < 0 ? -1 : 1;
+		if (ret > 0)
+			__system_property_set(WRITE_PROP, swb ? "codecs rebuild +EVS" : "codecs rebuild -EVS");
+		goto out;
+	}
+	if (len == 0) {
+		LOGI("%s: empty and nothing saved to rebuild it from; left alone", CODEC_LIST_PATH);
+		goto out;
+	}
+	if (orig && olen != len) {
 		free(orig);
 		orig = NULL;
 	}
@@ -1006,11 +1091,10 @@ static int apply_codec_list(int swb)
 				goto out;
 			}
 		}
-		if (efs_write_all(CODEC_LIST_PATH, stripped, len) < 0) {
+		if (write_list(stripped, len, "EVS taken out") < 0) {
 			ret = -1;
 			goto out;
 		}
-		LOGI("%s: EVS taken out (verified)", CODEC_LIST_PATH);
 		__system_property_set(WRITE_PROP, "codecs -EVS");
 		ret = 1;
 	} else if (orig) {
@@ -1019,11 +1103,10 @@ static int apply_codec_list(int swb)
 			LOGI("%s: not the list we stripped; left alone", CODEC_LIST_PATH);
 			goto out;
 		}
-		if (efs_write_all(CODEC_LIST_PATH, orig, len) < 0) {
+		if (write_list(orig, len, "shipped list restored") < 0) {
 			ret = -1;
 			goto out;
 		}
-		LOGI("%s: shipped list restored (verified)", CODEC_LIST_PATH);
 		__system_property_set(WRITE_PROP, "codecs +EVS");
 		{
 			const uint8_t cleared = 0;
@@ -1093,7 +1176,12 @@ int main(void)
 		if (rc >= 0) {
 			int lrc = apply_codec_list(swb);
 
-			if (lrc < 0) {
+			if (lrc < 0 && rc > 0) {
+				/* Byte 9 was written: flush it and say so; the list
+				 * is tried again on the re-check after the flush. */
+				LOGE("%s: codec list step failed; retrying after the flush",
+				     CODEC_LIST_PATH);
+			} else if (lrc < 0) {
 				status("failed");
 				rc = -1;
 			} else if (lrc > 0) {
@@ -1127,6 +1215,18 @@ int main(void)
 		}
 	} while (rc > 0 || (rc == 0 && swb != want_swb()));
 
+	/* A list written this boot needs a restart, whatever a later pass (or a
+	 * later run, e.g. on SIM load) found nothing else to do: the IMS stack
+	 * still runs with the list it read at its start. */
+	if (rc >= 0) {
+		char lw[PROP_VALUE_MAX] = {0}, st[PROP_VALUE_MAX] = {0};
+
+		__system_property_get(LIST_WRITE_PROP, lw);
+		__system_property_get(STATUS_PROP, st);
+		if (strcmp(lw, "1") == 0 && (strcmp(st, "capped") == 0 ||
+		    strcmp(st, "swb") == 0 || strcmp(st, "none") == 0))
+			status("restart");
+	}
 	dci_close();
 	return rc < 0 ? 1 : 0;
 }
