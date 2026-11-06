@@ -65,7 +65,9 @@
  * bench, both directions, speaker switched on and off). The original list is
  * saved in LIST_MARKER_PATH first; allowing SWB puts it back, and the next
  * restart lets EVS (and byte 9's SWB) be negotiated again. A profile reload
- * puts EVS back in the list; the next run takes it out again.
+ * puts EVS back in the list; the next run takes it out again. While EVS is out
+ * of the list byte 9 is left as it is: the modem resets it at every start then,
+ * and it cannot matter.
  *
  * Status, vendor.pepito.modem.evs (vendor_public_prop, read by LineageParts):
  *   capped | swb | none | saving | restart | unsupported | failed | off
@@ -773,6 +775,30 @@ static void note_write(const char *what, int from, int to)
 	LOGI("%s: byte %d %s (verified)", EVS_CFG_PATH, EVS_BW_BYTE, v);
 }
 
+/* 1 if the IMS codec list is there and has no EVS entry, 0 if it has one
+ * (or is absent or odd), -1 on a transport error. */
+static int list_without_evs(void)
+{
+	uint8_t *list = NULL;
+	char in[CODEC_LIST_MAX + 1], *tok, *save = NULL;
+	int len = 0, rc, evs = 0;
+
+	rc = efs_read_all(CODEC_LIST_PATH, &list, &len);
+	if (rc < 0)
+		return -1;
+	if (rc > 0 || len <= 0 || len > CODEC_LIST_MAX) {
+		free(list);
+		return 0;
+	}
+	memcpy(in, list, len);
+	in[len] = 0;
+	free(list);
+	for (tok = strtok_r(in, ";", &save); tok; tok = strtok_r(NULL, ";", &save))
+		if (strcmp(tok, "EVS") == 0)
+			evs = 1;
+	return !evs;
+}
+
 /*
  * One pass: bring byte 9 to what the switch asks for. Returns 1 if it wrote
  * anything, 0 if nothing needed writing (status already published), -1 on
@@ -886,6 +912,31 @@ static int apply(int swb)
 	}
 
 	g_tmo = 1;
+	if (!swb) {
+		int no_evs = list_without_evs();
+
+		if (no_evs < 0) {
+			free(cfg);
+			status("failed");
+			return -1;
+		}
+		if (no_evs) {
+			/* EVS is out of the codec list (apply_codec_list): no call
+			 * can use EVS, so byte 9 does not matter. Once EVS is out
+			 * of the list the modem rebuilds this item from the carrier
+			 * profile at every start (dut1, C1-162128 WS228,
+			 * 2026-11-05: byte 9 back at 03 on each boot); capping it
+			 * again would ask for a restart on every boot. */
+			LOGI("%s: no EVS in the codec list; byte 9 (%d) left alone",
+			     EVS_CFG_PATH, bw);
+			if (__system_property_get(BOOT_PROP, boot) <= 0)
+				__system_property_set(BOOT_PROP, "capped");
+			__system_property_get(BOOT_PROP, boot);
+			status(strcmp(boot, "capped") ? "restart" : "capped");
+			free(cfg);
+			return 0;
+		}
+	}
 	if (__system_property_get(BOOT_PROP, boot) <= 0)
 		__system_property_set(BOOT_PROP, state_of(bw, saved));
 
