@@ -38,6 +38,9 @@ blob_fixups: blob_fixups_user_type = {
     'vendor/bin/imsqmidaemon': blob_fixup().add_needed('libqmi_force_ipcr.so'),
     'vendor/bin/imsdatadaemon': blob_fixup().add_needed('libqmi_force_ipcr.so'),
     'vendor/bin/ims_rtp_daemon': blob_fixup().add_needed('libqmi_force_ipcr.so'),
+    # time_daemon is a QMI client of the modem TIME service (started on pepito
+    # by init.qmux.rc); same shim, same reason.
+    'vendor/bin/time_daemon': blob_fixup().add_needed('libqmi_force_ipcr.so'),
 }
 
 module = ExtractUtilsModule(

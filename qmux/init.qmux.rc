@@ -154,6 +154,22 @@ service qmux_wfc_efswrite /vendor/bin/wfc_efswrite
     oneshot
     disabled
 
+# time_daemon (QC time services): keeps the AP clock and the modem's time
+# bases in step over the modem's QMI TIME service (0x16) and persists the
+# offsets in /data/vendor/time + /mnt/vendor/persist/time, so the clock is
+# right from the first seconds of boot instead of sitting at 1970 until NITZ
+# or NTP arrives. The nightly blob rc (init.time_daemon.rc) never shipped, so
+# the daemon was never started on any variant; init.xiaomi.rc's
+# `restart time_daemon` at boot_completed expects this exact service name.
+# A QMI client -> carries the force-ipcr shim (DT_NEEDED, extract-files.py);
+# the legacy-um time_daemon domain already allows the ipc_router socket.
+# Started here for pepito only (ro.vendor.qmux.enable=1).
+service time_daemon /vendor/bin/time_daemon
+    class main
+    user root
+    group root
+    disabled
+
 # netmgrd (mobile data): programs the kernel rmnet_ipa data path over
 # WDS/WDA/IPA QMI. A QMI client -> carries the force-ipcr shim (DT_NEEDED);
 # the nightly netmgrd.rc is deliberately NOT shipped (it would free-run
@@ -181,6 +197,7 @@ on boot && property:ro.vendor.qmux.enable=1
     start qmux_rmt_storage
     start qmux_qcrild
     start qmux_netmgrd
+    start time_daemon
     # imsqmidaemon kicks the stock IMS prop chain; ims_rtp_daemon is also
     # started directly so the imsrtpservice HAL is up before the data daemon
     # reports in. Framework side is org.codeaurora.ims binding IImsRadio on

@@ -34,6 +34,12 @@ get_prop(ims, vendor_qmux_prop)
 allow hal_imsrtp self:socket create_socket_perms;
 get_prop(hal_imsrtp, vendor_qmux_prop)
 
+# time_daemon (legacy-um domain, started by init.qmux.rc on pepito) carries
+# the same force-ipcr DT_NEEDED; its ipc_router socket + msm_sock_ipc_ioctls
+# are already in device/qcom/sepolicy-legacy-um time_daemon.te, only the
+# shim's gate-prop read is missing.
+get_prop(time_daemon, vendor_qmux_prop)
+
 # ims_enabler — VoLTE NV self-heal boot oneshot (init.qmux.rc, PLAN-volte.md).
 # A QMI client on the ipc_router (generic socket) like the daemons above;
 # reads the qmux gate props (its own check + the force-ipcr preload) and
