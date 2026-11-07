@@ -1,3 +1,11 @@
 # Palm PVG100 (pepito) has one physical SIM slot.
 persist.radio.multisim.config=ssss
 ro.telephony.default_network=33
+
+# Send VOICE_COMMUNICATION capture (Meet, Google Voice, other VoIP apps) through
+# the normal audio-record usecase, not the ADSP compress-voip-call session. The
+# apps play out through low-latency-playback, so that session never gets
+# downlink data ("DL data not available" every 20 ms), and its echo/noise
+# processing gates the uplink: the mic sounded broken and Meet sent ~38 of 50
+# packets/s. With this off, new2 on a Meet call was clearly better (2026-11-07).
+vendor.voice.path.for.pcm.voip=false
