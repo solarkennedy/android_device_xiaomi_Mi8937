@@ -164,6 +164,11 @@ static void determine_device()
     } else if (codename == "pepito") {
         set_variant_props(pepito_info);
         property_override("ro.vendor.qmux.enable", "1");
+        // Keep call waiting on the phone (frameworks/opt/telephony + the
+        // terminal-based CW keys in mithorium-common's CarrierConfig): a CW
+        // query/set over QMI makes the modem try CSFB, which fails on LTE-only
+        // networks and drops IMS for minutes.
+        property_override("ro.telephony.force_terminal_based_cw", "true");
         set_pepito_identity();
     } else if (codename == "ugg") {
         set_variant_props(ugg_info);
