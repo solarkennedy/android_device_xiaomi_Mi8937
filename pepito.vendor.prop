@@ -9,3 +9,8 @@ ro.telephony.default_network=33
 # processing gates the uplink: the mic sounded broken and Meet sent ~38 of 50
 # packets/s. With this off, new2 on a Meet call was clearly better (2026-11-07).
 vendor.voice.path.for.pcm.voip=false
+
+# qcril feature 27: when on, the data RAT is reported as IWLAN whenever IMS
+# is on Wi-Fi, although the internet PDN rides LTE. Stock pepito leaves it
+# unset. See PLAN-oos-time E9 (2026-11-07).
+persist.vendor.radio.data_con_rprt=false
