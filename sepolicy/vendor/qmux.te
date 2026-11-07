@@ -112,6 +112,22 @@ allow wfc_wlan_bridge self:udp_socket { create ioctl };
 # priv_sock_ioctls neverallows are app/media/drm-scoped, not this vendor domain.
 allowxperm wfc_wlan_bridge self:udp_socket ioctl { unpriv_sock_ioctls priv_sock_ioctls };
 
+# pepito_clockfix — AP wall clock across boots (init.pepito-clockfix.rc,
+# qmux/pepito_clockfix.c). The PMIC RTC is a read-only raw counter on this
+# platform, so the two oneshots persist wall-minus-RTC in the legacy
+# time-services dir and re-apply it at post-fs-data. Runs as system with
+# CAP_SYS_TIME from init; reads the RTC through /dev/rtc0 (RTC_RD_TIME).
+type pepito_clockfix, domain;
+type pepito_clockfix_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(pepito_clockfix)
+
+allow pepito_clockfix self:global_capability_class_set sys_time;
+allow pepito_clockfix rtc_device:chr_file r_file_perms;
+allow pepito_clockfix vendor_time_data_file:dir rw_dir_perms;
+allow pepito_clockfix vendor_time_data_file:file create_file_perms;
+# Outcome for the bench (restored / saved / restore-skipped-rtc-reset ...).
+set_prop(pepito_clockfix, vendor_qmux_prop)
+
 # wfc_efswrite — VoWiFi ps_sys field-4 self-heal oneshot (init.qmux.rc,
 # PLAN-vowifi.md parts 44-47). Unlike the QMI clients above it talks DCI/EFS2
 # directly on /dev/diag (no ipc_router socket, no force-ipcr). It opens

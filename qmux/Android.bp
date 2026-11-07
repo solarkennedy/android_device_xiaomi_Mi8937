@@ -55,6 +55,22 @@ cc_binary {
     cflags: ["-Wall", "-Werror"],
 }
 
+// pepito_clockfix — [pepito] AP wall clock across boots without writing the
+// PMIC RTC (a read-only raw counter here, as on stock): two init oneshots
+// that persist wall-minus-RTC at boot_completed/shutdown and re-apply it at
+// post-fs-data while the clock still reads 1970. No QMI, no modem; the
+// legacy-um vendor_time_data_file dir holds the state. See pepito_clockfix.c.
+cc_binary {
+    name: "pepito_clockfix",
+    srcs: ["pepito_clockfix.c"],
+    vendor: true,
+    init_rc: ["init.pepito-clockfix.rc"],
+    shared_libs: [
+        "liblog",
+    ],
+    cflags: ["-Wall", "-Werror"],
+}
+
 // modem_b12 — [qmux, Modem Tweaks] LTE Band 12 switch. Writes the four B12 RF
 // calibration items (shipped below) and NV 6828 bit 11 over DCI on /dev/diag,
 // gated on persist.gotweak.modem_b12. Diag-only like wfc_efswrite, so no

@@ -413,6 +413,7 @@ PRODUCT_PACKAGES += \
     ims_enabler \
     wfc_wlan_bridge \
     wfc_efswrite \
+    pepito_clockfix \
     modem_b12 \
     modem_evs \
     init.pepito-modem-evs.rc \
